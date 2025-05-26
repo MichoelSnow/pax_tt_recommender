@@ -1,9 +1,12 @@
 [tool.poetry]
 name = "pax-tt-recommender"
 version = "0.1.0"
-description = ""
+description = "BoardGameGeek data crawler and recommender system"
 authors = ["MichoelSnow <michoelsnow@gmail.com>"]
 readme = "README.md"
+packages = [
+    { include = "crawler" }
+]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -16,6 +19,7 @@ black = "^25.1.0"
 requests = "^2.32.3"
 pandas = "^2.2.3"
 selenium = "^4.32.0"
+beautifulsoup4 = "^4.13.4"
 
 
 [build-system]

@@ -3,11 +3,13 @@ import json
 import requests
 from zipfile import ZipFile
 from io import BytesIO
-from time import sleep
+from time import sleep, time
 import pandas as pd
 from datetime import datetime
 import math
 import bs4
+import logging
+import csv
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -16,8 +18,17 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("crawler.log"), logging.StreamHandler()],
+)
+logger = logging.getLogger(__name__)
+
 
 def get_driver_and_cookies():
+    logger.info("Initializing web driver and getting cookies")
     LOGIN_USERNAME_FIELD = '//*[@id="inputUsername"]'
     LOGIN_PASSWORD_FIELD = '//*[@id="inputPassword"]'
     LOGIN_BUTTON = '//*[@id="mainbody"]/div/div/gg-login-page/div[1]/div/gg-login-form/form/fieldset/div[3]/button[1]'
@@ -37,6 +48,8 @@ def get_driver_and_cookies():
         service=Service("/usr/lib/chromium-browser/chromedriver"),
         options=chrome_options,
     )
+    logger.info("Chrome driver initialized successfully")
+
     driver.get("https://boardgamegeek.com/login")
     login = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.XPATH, LOGIN_USERNAME_FIELD))
@@ -54,32 +67,59 @@ def get_driver_and_cookies():
 
     login_button.click()
     sleep(1)
+    logger.info("Successfully logged in to BoardGameGeek")
+
     selenium_cookies = driver.get_cookies()
     for cookie in selenium_cookies:
         cookies[cookie["name"]] = cookie["value"]
+    logger.info("Successfully retrieved cookies")
     return cookies
 
 
-def get_boardgame_list(cookies: dict):
-    bg_list_pg_url = "https://boardgamegeek.com/data_dumps/bg_ranks"
-    resp = requests.get(bg_list_pg_url, cookies=cookies)
+def get_boardgame_ranks(cookies: dict, save_file: bool = False):
+    logger.info("Fetching boardgame ranks")
+    bg_ranks_pg_url = "https://boardgamegeek.com/data_dumps/bg_ranks"
+    resp = requests.get(bg_ranks_pg_url, cookies=cookies)
     soup = BeautifulSoup(resp.content, "html.parser")
-    bg_list_url = soup.find("div", {"id": "maincontent"})("a")[0]["href"]
-    bg_list_zip = requests.get(bg_list_url)
-    with ZipFile(BytesIO(bg_list_zip.content)) as archive:
+    bg_ranks_url = soup.find("div", {"id": "maincontent"})("a")[0]["href"]
+    bg_ranks_zip = requests.get(bg_ranks_url)
+    queried_at_utc = datetime.now().replace(microsecond=0).isoformat()
+    with ZipFile(BytesIO(bg_ranks_zip.content)) as archive:
         with archive.open("boardgames_ranks.csv") as csv:
-            df_bg_list = pd.read_csv(csv)
-            df_bg_list["queried_at_utc"] = (
-                datetime.now().replace(microsecond=0).isoformat()
-            )
-            return df_bg_list
+            df_bg_ranks = pd.read_csv(csv)
+            df_bg_ranks["queried_at_utc"] = queried_at_utc
+            logger.info(f"Successfully loaded {len(df_bg_ranks)} boardgames")
+            if save_file:
+                df_bg_ranks.to_csv(
+                    f"../../data/boardgame_ranks_{queried_at_utc[:10].replace('-','')}.csv",
+                    index=False,
+                    sep="|",
+                    escapechar="\\",
+                    quoting=csv.QUOTE_NONE,
+                )
+            return df_bg_ranks
 
 
-def get_boardgame_raw_data(boardgame_df: pd.DataFrame):
-    boardgame_ids = boardgame_df["id"].tolist()
+def get_boardgame_raw_data(
+    boardgame_ranks: pd.DataFrame,
+    bg_data_raw: pd.DataFrame = None,
+    batch_saves: bool = False,
+    batch_size: int = 20,
+):
+    logger.info(f"Starting to fetch raw data for {len(boardgame_ranks)} boardgames")
+    boardgame_ids = boardgame_ranks["id"].tolist()
     boardgame_master_dict = {}
-    batch_size = 3
+    if bg_data_raw is not None:
+        boardgame_master_dict = {
+            x["game_id"]: x for x in bg_data_raw.to_dict(orient="records")
+        }
+        boardgame_ids = [
+            x for x in boardgame_ids if x not in bg_data_raw["game_id"].tolist()
+        ]
     for batch_num in range(math.ceil(len(boardgame_ids) / batch_size)):
+        logger.info(
+            f"Processing batch {batch_num + 1} of {math.ceil(len(boardgame_ids) / batch_size)}"
+        )
         batch_ids = boardgame_ids[batch_num * batch_size : (batch_num + 1) * batch_size]
         batch_ids = [str(x) for x in batch_ids]
         bg_info_url = f"https://www.boardgamegeek.com/xmlapi2/thing?type=boardgame&stats=1&versions=1&ratingcomments=1&pagesize=100&page=1&id={','.join(batch_ids)}"
@@ -97,10 +137,14 @@ def get_boardgame_raw_data(boardgame_df: pd.DataFrame):
             if game_dict["numratings"] > 0:
                 game_dict = extract_ratings(game_dict=game_dict, game_xml=game_xml)
             ratings_count_dict[game_dict["game_id"]] = game_dict["numratings"]
-            max_ratings_page = math.ceil(max(ratings_count_dict.values()) / 100)
             boardgame_master_dict[game_dict["game_id"]] = game_dict
+
+        max_ratings_page = math.ceil(max(ratings_count_dict.values()) / 100)
+        logger.info(
+            f"Processing {max_ratings_page} rating pages for batch {batch_num + 1}"
+        )
+
         for page_num in range(2, max_ratings_page + 1):
-            print(page_num)
             # Only grab the pages for games which have enough ratings to be on the page num
             batch_ids_ratings = [
                 str(x)
@@ -113,13 +157,55 @@ def get_boardgame_raw_data(boardgame_df: pd.DataFrame):
             ratings_xml_list = soup_rating_xml.find_all(
                 "item", attrs={"type": "boardgame"}
             )
+
             for game_xml in ratings_xml_list:
                 game_dict = boardgame_master_dict[game_xml["id"]]
                 boardgame_master_dict[game_dict["game_id"]] = extract_ratings(
                     game_dict=game_dict, game_xml=game_xml
                 )
-        break
-    return list(boardgame_master_dict.values())
+            sleep(2)
+            if batch_saves and page_num % 10 == 0:
+                save_time = int(time())
+                bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
+                save_path = f"../../data/boardgame_data_raw_{save_time}.csv"
+                bg_data_raw.to_csv(
+                    save_path,
+                    index=False,
+                    sep="|",
+                    escapechar="\\",
+                    quoting=csv.QUOTE_NONE,
+                )
+                logger.info(
+                    f"Saved batch {batch_num + 1} ratings page {page_num} of {max_ratings_page} data to {save_path}"
+                )
+            elif page_num % 10 == 0:
+                logger.info(f"Processed ratings page {page_num} of {max_ratings_page}")
+        if batch_saves:
+            save_time = int(time())
+            bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
+            save_path = f"../../data/boardgame_data_raw_{save_time}.csv"
+            bg_data_raw.to_csv(
+                save_path,
+                index=False,
+                sep="|",
+                escapechar="\\",
+                quoting=csv.QUOTE_NONE,
+            )
+            logger.info(f"Saved batch {batch_num + 1} data to {save_path}")
+
+    bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
+    logger.info("Successfully completed fetching all boardgame data")
+    save_time = int(time())
+    save_path = f"../../data/boardgame_data_raw_{save_time}.csv"
+    bg_data_raw.to_csv(
+        save_path,
+        index=False,
+        sep="|",
+        escapechar="\\",
+        quoting=csv.QUOTE_NONE,
+    )
+    logger.info(f"Saved final data to {save_path}")
+    return bg_data_raw
 
 
 def extract_basic_game_info(game_xml: bs4.element.Tag):

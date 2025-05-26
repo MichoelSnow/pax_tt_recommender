@@ -43,3 +43,6 @@ frontend/.vite/
 
 # data
 data/
+
+# Poetry
+poetry.lock
