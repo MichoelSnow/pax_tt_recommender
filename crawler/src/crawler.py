@@ -111,11 +111,36 @@ def get_boardgame_raw_data(
     boardgame_master_dict = {}
     if bg_data_raw is not None:
         boardgame_master_dict = {
-            x["game_id"]: x for x in bg_data_raw.to_dict(orient="records")
+           str(x["game_id"]): x for x in bg_data_raw.to_dict(orient="records")
         }
         boardgame_ids = [
             x for x in boardgame_ids if x not in bg_data_raw["game_id"].tolist()
         ]
+        processed_ids = bg_data_raw["game_id"].tolist()
+    # Check if there are any ids which have not had all their ratings pulled down yet
+    if len(processed_ids) > 0:
+        bg_data_raw["ratings_pulled"] = (
+            bg_data_raw["ratings"]
+            .apply(lambda x: sum([len(v) for k, v in x.items()]))
+            .tolist()
+        )
+        df_missing_ratings = bg_data_raw[
+            bg_data_raw["ratings_pulled"] < bg_data_raw["numratings"]
+        ]
+        if df_missing_ratings.shape[0] > 0:
+            ratings_count_dict = pd.Series(
+                df_missing_ratings["numratings"].values,
+                index=df_missing_ratings["game_id"],
+            ).to_dict()
+            max_ratings_page = math.ceil(max(ratings_count_dict.values()) / 100)
+            start_page = int(bg_data_raw["ratings_pulled"].min() / 100)
+            boardgame_master_dict = iterate_through_ratings_pages(
+                boardgame_master_dict=boardgame_master_dict,
+                max_ratings_page=max_ratings_page,
+                ratings_count_dict=ratings_count_dict,
+                start_page=start_page,
+                batch_saves=batch_saves,
+            )        
     for batch_num in range(math.ceil(len(boardgame_ids) / batch_size)):
         logger.info(
             f"Processing batch {batch_num + 1} of {math.ceil(len(boardgame_ids) / batch_size)}"
@@ -143,69 +168,65 @@ def get_boardgame_raw_data(
         logger.info(
             f"Processing {max_ratings_page} rating pages for batch {batch_num + 1}"
         )
-
-        for page_num in range(2, max_ratings_page + 1):
-            # Only grab the pages for games which have enough ratings to be on the page num
-            batch_ids_ratings = [
-                str(x)
-                for x in ratings_count_dict.keys()
-                if math.ceil(ratings_count_dict[x] / 100) >= page_num
-            ]
-            bg_rating_url = f"https://www.boardgamegeek.com/xmlapi2/thing?type=boardgame&ratingcomments=1&pagesize=100&page={page_num}&id={','.join(batch_ids_ratings)}"
-            bgg_rating_response = requests.get(bg_rating_url)
-            soup_rating_xml = BeautifulSoup(bgg_rating_response.content, "xml")
-            ratings_xml_list = soup_rating_xml.find_all(
-                "item", attrs={"type": "boardgame"}
-            )
-
-            for game_xml in ratings_xml_list:
-                game_dict = boardgame_master_dict[game_xml["id"]]
-                boardgame_master_dict[game_dict["game_id"]] = extract_ratings(
-                    game_dict=game_dict, game_xml=game_xml
-                )
-            sleep(2)
-            if batch_saves and page_num % 10 == 0:
-                save_time = int(time())
-                bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
-                save_path = f"../../data/boardgame_data_raw_{save_time}.csv"
-                bg_data_raw.to_csv(
-                    save_path,
-                    index=False,
-                    sep="|",
-                    escapechar="\\",
-                    quoting=csv.QUOTE_NONE,
-                )
-                logger.info(
-                    f"Saved batch {batch_num + 1} ratings page {page_num} of {max_ratings_page} data to {save_path}"
-                )
-            elif page_num % 10 == 0:
-                logger.info(f"Processed ratings page {page_num} of {max_ratings_page}")
+        boardgame_master_dict = iterate_through_ratings_pages(
+            boardgame_master_dict=boardgame_master_dict,
+            max_ratings_page=max_ratings_page,
+            ratings_count_dict=ratings_count_dict,
+            start_page=2,
+            batch_saves=batch_saves,
+        )
         if batch_saves:
             save_time = int(time())
             bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
-            save_path = f"../../data/boardgame_data_raw_{save_time}.csv"
-            bg_data_raw.to_csv(
-                save_path,
-                index=False,
-                sep="|",
-                escapechar="\\",
-                quoting=csv.QUOTE_NONE,
-            )
+            save_path = f"../../data/boardgame_data_raw_{save_time}.parquet"
+            bg_data_raw.to_parquet(save_path)
             logger.info(f"Saved batch {batch_num + 1} data to {save_path}")
 
     bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
     logger.info("Successfully completed fetching all boardgame data")
     save_time = int(time())
-    save_path = f"../../data/boardgame_data_raw_{save_time}.csv"
-    bg_data_raw.to_csv(
-        save_path,
-        index=False,
-        sep="|",
-        escapechar="\\",
-        quoting=csv.QUOTE_NONE,
-    )
+    save_path = f"../../data/boardgame_data_raw_{save_time}.parquet"
+    bg_data_raw.to_parquet(save_path)
     logger.info(f"Saved final data to {save_path}")
     return bg_data_raw
+
+
+def iterate_through_ratings_pages(
+    boardgame_master_dict: dict,
+    max_ratings_page: int,
+    ratings_count_dict: dict,
+    start_page: int = 2,
+    batch_saves: bool = False,
+):
+    for page_num in range(start_page, max_ratings_page + 1):
+        # Only grab the pages for games which have enough ratings to be on the page num
+        batch_ids_ratings = [
+            str(x)
+            for x in ratings_count_dict.keys()
+            if math.ceil(ratings_count_dict[x] / 100) >= page_num
+        ]
+        bg_rating_url = f"https://www.boardgamegeek.com/xmlapi2/thing?type=boardgame&ratingcomments=1&pagesize=100&page={page_num}&id={','.join(batch_ids_ratings)}"
+        bgg_rating_response = requests.get(bg_rating_url)
+        soup_rating_xml = BeautifulSoup(bgg_rating_response.content, "xml")
+        ratings_xml_list = soup_rating_xml.find_all("item", attrs={"type": "boardgame"})
+
+        for game_xml in ratings_xml_list:
+            game_dict = boardgame_master_dict[game_xml["id"]]
+            boardgame_master_dict[game_dict["game_id"]] = extract_ratings(
+                game_dict=game_dict, game_xml=game_xml
+            )
+        sleep(2)
+        if batch_saves and page_num % 30 == 0:
+            save_time = int(time())
+            bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
+            save_path = f"../../data/boardgame_data_raw_{save_time}.parquet"
+            bg_data_raw.to_parquet(save_path)
+            logger.info(
+                f"Saved ratings page {page_num} of {max_ratings_page} data to {save_path}"
+            )
+        elif page_num % 30 == 0:
+            logger.info(f"Processed ratings page {page_num} of {max_ratings_page}")
+    return boardgame_master_dict
 
 
 def extract_basic_game_info(game_xml: bs4.element.Tag):
