@@ -1,0 +1,45 @@
+# .gitignore
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+
+# Python distribution / packaging
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# SQLite database
+*.db
+backend/database/*.db
+
+# Logs
+*.log
+import.log
+
+# Jupyter Notebooks
+*.ipynb
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
+
+# Environment files
+.env
+.env.*
+
+# Node modules
+node_modules/
+
+# Frontend build
+frontend/dist/
+frontend/.vite/
+
+# data
+data/
