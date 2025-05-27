@@ -105,48 +105,36 @@ def get_boardgame_raw_data(
     bg_data_raw: pd.DataFrame = None,
     batch_saves: bool = False,
     batch_size: int = 20,
+    log_level: str = "INFO",
 ):
+    # Set logging level for this function
+    current_level = logger.level
+    logger.setLevel(getattr(logging, log_level.upper()))
+
     logger.info(f"Starting to fetch raw data for {len(boardgame_ranks)} boardgames")
+    query_time = int(time())
+    save_path = f"../../data/boardgame_data/boardgame_data_raw_{query_time}.parquet"
     boardgame_ids = boardgame_ranks["id"].tolist()
     boardgame_master_dict = {}
     if bg_data_raw is not None:
+        logger.info("Using existing boardgame data as base")
         boardgame_master_dict = {
-           str(x["game_id"]): x for x in bg_data_raw.to_dict(orient="records")
+            str(x["game_id"]): x for x in bg_data_raw.to_dict(orient="records")
         }
-        boardgame_ids = [
-            x for x in boardgame_ids if x not in bg_data_raw["game_id"].tolist()
-        ]
-        processed_ids = bg_data_raw["game_id"].tolist()
-    # Check if there are any ids which have not had all their ratings pulled down yet
-    if len(processed_ids) > 0:
-        bg_data_raw["ratings_pulled"] = (
-            bg_data_raw["ratings"]
-            .apply(lambda x: sum([len(v) for k, v in x.items()]))
-            .tolist()
+        boardgame_ids = list(
+            set(boardgame_ids).difference(
+                set(bg_data_raw["game_id"].astype(int).tolist())
+            )
         )
-        df_missing_ratings = bg_data_raw[
-            bg_data_raw["ratings_pulled"] < bg_data_raw["numratings"]
-        ]
-        if df_missing_ratings.shape[0] > 0:
-            ratings_count_dict = pd.Series(
-                df_missing_ratings["numratings"].values,
-                index=df_missing_ratings["game_id"],
-            ).to_dict()
-            max_ratings_page = math.ceil(max(ratings_count_dict.values()) / 100)
-            start_page = int(bg_data_raw["ratings_pulled"].min() / 100)
-            boardgame_master_dict = iterate_through_ratings_pages(
-                boardgame_master_dict=boardgame_master_dict,
-                max_ratings_page=max_ratings_page,
-                ratings_count_dict=ratings_count_dict,
-                start_page=start_page,
-                batch_saves=batch_saves,
-            )        
+        # processed_ids = bg_data_raw["game_id"].tolist()
+    logger.info(f"Found {len(boardgame_ids)} new boardgames to process")
     for batch_num in range(math.ceil(len(boardgame_ids) / batch_size)):
         logger.info(
             f"Processing batch {batch_num + 1} of {math.ceil(len(boardgame_ids) / batch_size)}"
         )
         batch_ids = boardgame_ids[batch_num * batch_size : (batch_num + 1) * batch_size]
         batch_ids = [str(x) for x in batch_ids]
+        logger.debug(f"Processing boardgame IDs: {batch_ids}")
         bg_info_url = f"https://www.boardgamegeek.com/xmlapi2/thing?type=boardgame&stats=1&versions=1&ratingcomments=1&pagesize=100&page=1&id={','.join(batch_ids)}"
         bgg_response = requests.get(bg_info_url)
         soup_xml = BeautifulSoup(bgg_response.content, "xml")
@@ -159,11 +147,98 @@ def get_boardgame_raw_data(
                 game_dict=game_dict, game_xml=game_xml
             )
             game_dict = extract_version_info(game_dict=game_dict, game_xml=game_xml)
-            if game_dict["numratings"] > 0:
-                game_dict = extract_ratings(game_dict=game_dict, game_xml=game_xml)
+            # if game_dict["numratings"] > 0:
+            #     game_dict = extract_ratings(game_dict=game_dict, game_xml=game_xml)
             ratings_count_dict[game_dict["game_id"]] = game_dict["numratings"]
             boardgame_master_dict[game_dict["game_id"]] = game_dict
+            logger.debug(f"Completed processing game ID: {game_xml['id']}")
 
+        # max_ratings_page = math.ceil(max(ratings_count_dict.values()) / 100)
+        # logger.info(
+        #     f"Processing {max_ratings_page} rating pages for batch {batch_num + 1}"
+        # )
+        # boardgame_master_dict = iterate_through_ratings_pages(
+        #     boardgame_master_dict=boardgame_master_dict,
+        #     max_ratings_page=max_ratings_page,
+        #     ratings_count_dict=ratings_count_dict,
+        #     start_page=2,
+        #     batch_saves=batch_saves,
+        # )
+        if batch_saves:
+            logger.info(f"Saving batch {batch_num + 1} data")
+            bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
+            bg_data_raw.to_parquet(save_path)
+            logger.info(f"Saved batch {batch_num + 1} data to {save_path}")
+        sleep(1)
+
+    bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
+    logger.info("Successfully completed fetching all boardgame data")
+    bg_data_raw.to_parquet(save_path)
+    logger.info(f"Saved final data to {save_path}")
+
+    # Restore original logging level
+    logger.setLevel(current_level)
+    return bg_data_raw
+
+
+def get_rankings_data(
+    boardgame_data: pd.DataFrame,
+    rankings_dataframe: pd.DataFrame = None,
+    batch_saves: bool = False,
+    batch_size: int = 20,
+):
+    boardgame_master_dict = {}
+    # Check if there are any ids which have not had all their ratings pulled down yet
+    if rankings_dataframe is not None:
+        df_ratings_len = rankings_dataframe.copy()
+        df_ratings_len = df_ratings_len.drop(columns=["game_id"])
+        df_ratings_len = df_ratings_len.fillna("")
+        for col in df_ratings_len.columns:
+            df_ratings_len[col] = df_ratings_len[col].apply(len)
+        df_ratings_pulled = pd.DataFrame(
+            {
+                "game_id": rankings_dataframe["game_id"].tolist(),
+                "ratings_pulled": df_ratings_len.sum(axis=1).tolist(),
+            }
+        )
+        boardgame_data = boardgame_data.merge(df_ratings_pulled, on="game_id", how="left")
+        df_missing_ratings = boardgame_data[
+            boardgame_data["ratings_pulled"] < boardgame_data["numratings"]
+        ]
+        df_ratings_tmp = rankings_dataframe.copy().set_index("game_id")
+        df_ratings_tmp.index.name = None
+        boardgame_master_dict = df_ratings_tmp.to_dict(orient="index")
+
+        if df_missing_ratings.shape[0] > 0:
+            ratings_count_dict = pd.Series(
+                df_missing_ratings["numratings"].values,
+                index=df_missing_ratings["game_id"],
+            ).to_dict()
+            max_ratings_page = math.ceil(max(ratings_count_dict.values()) / 100)
+            start_page = int(df_missing_ratings["ratings_pulled"].min() / 100)
+            boardgame_master_dict = iterate_through_ratings_pages(
+                boardgame_master_dict=boardgame_master_dict,
+                max_ratings_page=max_ratings_page,
+                ratings_count_dict=ratings_count_dict,
+                start_page=start_page,
+                batch_saves=batch_saves,
+            )
+    boardgame_data = boardgame_data.loc[boardgame_data["numratings"] > 0].sort_values(
+        by="numratings", ascending=False
+    )
+    boardgame_ids = boardgame_data["game_id"].tolist()
+    save_time = int(time())
+    save_path = f"../../data/boardgame_data/boardgame_rating_data_{save_time}.parquet"
+    for batch_num in range(math.ceil(len(boardgame_ids) / batch_size)):
+        logger.info(
+            f"Processing batch {batch_num + 1} of {math.ceil(len(boardgame_ids) / batch_size)}"
+        )
+        batch_ids = boardgame_ids[batch_num * batch_size : (batch_num + 1) * batch_size]
+        df_batch_games = boardgame_data.loc[boardgame_data["game_id"].isin(batch_ids)]
+        ratings_count_dict = pd.Series(
+            df_batch_games["numratings"].values,
+            index=df_batch_games["game_id"],
+        ).to_dict()
         max_ratings_page = math.ceil(max(ratings_count_dict.values()) / 100)
         logger.info(
             f"Processing {max_ratings_page} rating pages for batch {batch_num + 1}"
@@ -172,31 +247,37 @@ def get_boardgame_raw_data(
             boardgame_master_dict=boardgame_master_dict,
             max_ratings_page=max_ratings_page,
             ratings_count_dict=ratings_count_dict,
-            start_page=2,
+            start_page=1,
             batch_saves=batch_saves,
+            save_path=save_path,
         )
-        if batch_saves:
-            save_time = int(time())
-            bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
-            save_path = f"../../data/boardgame_data_raw_{save_time}.parquet"
-            bg_data_raw.to_parquet(save_path)
-            logger.info(f"Saved batch {batch_num + 1} data to {save_path}")
 
-    bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
-    logger.info("Successfully completed fetching all boardgame data")
-    save_time = int(time())
-    save_path = f"../../data/boardgame_data_raw_{save_time}.parquet"
-    bg_data_raw.to_parquet(save_path)
+        if batch_saves:
+            logger.info(f"Saving batch {batch_num + 1} data")
+            df_ratings = (
+                pd.DataFrame()
+                .from_dict(data=boardgame_master_dict, orient="index")
+                .reset_index(names="game_id")
+            )
+            df_ratings.to_parquet(save_path)
+            logger.info(f"Saved batch {batch_num + 1} data to {save_path}")
+    df_ratings = (
+        pd.DataFrame()
+        .from_dict(data=boardgame_master_dict, orient="index")
+        .reset_index(names="game_id")
+    )
+    df_ratings.to_parquet(save_path)
     logger.info(f"Saved final data to {save_path}")
-    return bg_data_raw
+    return df_ratings
 
 
 def iterate_through_ratings_pages(
     boardgame_master_dict: dict,
     max_ratings_page: int,
     ratings_count_dict: dict,
-    start_page: int = 2,
+    start_page: int,
     batch_saves: bool = False,
+    save_path: str = None,
 ):
     for page_num in range(start_page, max_ratings_page + 1):
         # Only grab the pages for games which have enough ratings to be on the page num
@@ -211,25 +292,29 @@ def iterate_through_ratings_pages(
         ratings_xml_list = soup_rating_xml.find_all("item", attrs={"type": "boardgame"})
 
         for game_xml in ratings_xml_list:
-            game_dict = boardgame_master_dict[game_xml["id"]]
-            boardgame_master_dict[game_dict["game_id"]] = extract_ratings(
-                game_dict=game_dict, game_xml=game_xml
+            if game_xml["id"] not in boardgame_master_dict:
+                boardgame_master_dict[game_xml["id"]] = {}
+            boardgame_master_dict[game_xml["id"]] = extract_ratings(
+                game_dict=boardgame_master_dict[game_xml["id"]], game_xml=game_xml
             )
-        sleep(2)
         if batch_saves and page_num % 30 == 0:
-            save_time = int(time())
-            bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
-            save_path = f"../../data/boardgame_data_raw_{save_time}.parquet"
-            bg_data_raw.to_parquet(save_path)
+            df_ratings = (
+                pd.DataFrame()
+                .from_dict(data=boardgame_master_dict, orient="index")
+                .reset_index(names="game_id")
+            )
+            df_ratings.to_parquet(save_path)
             logger.info(
                 f"Saved ratings page {page_num} of {max_ratings_page} data to {save_path}"
             )
         elif page_num % 30 == 0:
             logger.info(f"Processed ratings page {page_num} of {max_ratings_page}")
+        sleep(1)
     return boardgame_master_dict
 
 
 def extract_basic_game_info(game_xml: bs4.element.Tag):
+    logger.debug(f"Extracting basic game info for {game_xml['id']}")
     game_dict = {
         "game_id": game_xml["id"],
     }
@@ -282,10 +367,12 @@ def extract_basic_game_info(game_xml: bs4.element.Tag):
         game_dict["numratings"] = int(game_xml.find("comments")["totalitems"])
     else:
         game_dict["numratings"] = 0
+    logger.debug(f"Successfully extracted basic game info for {game_xml['id']}")
     return game_dict
 
 
 def extract_polls(game_dict: dict, game_xml: bs4.element.Tag):
+    logger.debug(f"Extracting polls for {game_xml['id']}")
     for poll_name in ["suggested_playerage", "language_dependence"]:
         if poll_name == "suggested_playerage":
             raw_value_col = "value"
@@ -322,10 +409,12 @@ def extract_polls(game_dict: dict, game_xml: bs4.element.Tag):
             suggested_prcnt = {}
         game_dict[poll_name] = result_dict
         game_dict[f"{poll_name}_quartiles"] = suggested_prcnt
+    logger.debug(f"Successfully extracted polls for {game_xml['id']}")
     return game_dict
 
 
 def extract_poll_player_count(game_dict: dict, game_xml: bs4.element.Tag):
+    logger.debug(f"Extracting player count poll for {game_xml['id']}")
     player_count_poll = game_xml.find("poll", attrs={"name": "suggested_numplayers"})
     result_dict = {"total_votes": int(player_count_poll.attrs["totalvotes"])}
     player_count_results = player_count_poll.find_all("results")
@@ -346,41 +435,54 @@ def extract_poll_player_count(game_dict: dict, game_xml: bs4.element.Tag):
             int(x.attrs["numvotes"]) for x in player_count.find_all("result")
         )
     game_dict["suggested_numplayers"] = result_dict
+    logger.debug(f"Successfully extracted player count poll for {game_xml['id']}")
     return game_dict
 
 
 def extract_version_info(game_dict: dict, game_xml: bs4.element.Tag):
+    logger.debug(f"Extracting version info for {game_xml['id']}")
     version_items = game_xml.find_all("item", attrs={"type": "boardgameversion"})
     version_list = []
     for vrs in version_items:
-        version_dict = {
-            "version_id": int(vrs["id"]),
-            "version_nickname": vrs.find("name", attrs={"type": "primary"})["value"],
-            "width": round(float(vrs.find("width")["value"])),
-            "length": round(float(vrs.find("length")["value"])),
-            "depth": round(float(vrs.find("depth")["value"])),
-            "year_published": round(float(vrs.find("yearpublished")["value"])),
-            "language": vrs.find("link", attrs={"type": "language"})["value"].lower(),
-        }
-        if vrs.find("thumbnail") is not None:
-            version_dict["thumbnail"] = vrs.find("thumbnail").text
-            version_dict["image"] = vrs.find("image").text
-        if version_dict["width"] > 0:
-            version_list.append(version_dict)
+        try:
+            version_dict = {
+                "version_id": int(vrs["id"]),
+                "width": round(float(vrs.find("width")["value"])),
+                "length": round(float(vrs.find("length")["value"])),
+                "depth": round(float(vrs.find("depth")["value"])),
+                "year_published": round(float(vrs.find("yearpublished")["value"])),
+            }
+            if vrs.find("thumbnail") is not None:
+                version_dict["thumbnail"] = vrs.find("thumbnail").text
+                version_dict["image"] = vrs.find("image").text
+            if vrs.find("link", attrs={"type": "language"}) is not None:
+                version_dict["language"] = vrs.find("link", attrs={"type": "language"})[
+                    "value"
+                ].lower()
+            if vrs.find("name", attrs={"type": "primary"}) is not None:
+                version_dict["version_nickname"] = vrs.find(
+                    "name", attrs={"type": "primary"}
+                )["value"]
+            if version_dict["width"] > 0:
+                version_list.append(version_dict)
+        except TypeError as e:
+            logger.error(
+                f"TypeError processing version for game ID {game_xml['id']}: {str(e)}"
+            )
+            raise
     if len(version_list) > 0:
         game_dict["versions"] = version_list
+    logger.debug(f"Successfully extracted version info for {game_xml['id']}")
     return game_dict
 
 
 def extract_ratings(game_dict: dict, game_xml: bs4.element.Tag):
     ratings_list = game_xml.find_all("comment")
-    if "ratings" not in game_dict:
-        game_dict["ratings"] = {}
     for rating in ratings_list:
         # round the rating to the nearest 0.5
-        rating_round = round(2 * float(rating["rating"])) / 2
-        if rating_round not in game_dict["ratings"]:
-            game_dict["ratings"][rating_round] = [rating["username"]]
+        rating_round = str(round(2 * float(rating["rating"])) / 2)
+        if rating_round not in game_dict:
+            game_dict[rating_round] = [rating["username"]]
         else:
-            game_dict["ratings"][rating_round].append(rating["username"])
+            game_dict[rating_round].append(rating["username"])
     return game_dict
