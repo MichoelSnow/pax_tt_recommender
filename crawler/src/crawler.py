@@ -201,7 +201,9 @@ def get_rankings_data(
                 "ratings_pulled": df_ratings_len.sum(axis=1).tolist(),
             }
         )
-        boardgame_data = boardgame_data.merge(df_ratings_pulled, on="game_id", how="left")
+        boardgame_data = boardgame_data.merge(
+            df_ratings_pulled, on="game_id", how="left"
+        )
         df_missing_ratings = boardgame_data[
             boardgame_data["ratings_pulled"] < boardgame_data["numratings"]
         ]

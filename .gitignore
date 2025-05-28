@@ -24,7 +24,6 @@ backend/database/*.db
 import.log
 
 # Jupyter Notebooks
-*.ipynb
 .ipynb_checkpoints/
 
 # VS Code
