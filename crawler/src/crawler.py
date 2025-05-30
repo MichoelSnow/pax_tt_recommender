@@ -11,7 +11,7 @@ Execution Flow:
 1. get_driver_and_cookies() - Get authentication cookies for BGG
 2. get_boardgame_ranks() - Download current board game rankings
 3. get_boardgame_raw_data() - Fetch detailed game information
-4. get_rankings_data() - Fetch user ratings and comments
+4. get_ratings_data() - Fetch user ratings and comments
 
 Note: The script requires a config.json file with BGG credentials.
 """
@@ -216,9 +216,9 @@ def get_boardgame_raw_data(
     return bg_data_raw
 
 
-def get_rankings_data(
+def get_ratings_data(
     boardgame_data: pd.DataFrame,
-    rankings_dataframe: pd.DataFrame = None,
+    ratings_dataframe: pd.DataFrame = None,
     batch_saves: bool = False,
     batch_size: int = 20,
 ):
@@ -228,7 +228,7 @@ def get_rankings_data(
     
     Args:
         boardgame_data (pd.DataFrame): DataFrame from get_boardgame_raw_data()
-        rankings_dataframe (pd.DataFrame, optional): Existing ratings data to update
+        ratings_dataframe (pd.DataFrame, optional): Existing ratings data to update
         batch_saves (bool): Whether to save data after each batch
         batch_size (int): Number of games to process in each batch. BGG API has a limit of 20 IDs per request.
         
@@ -237,15 +237,15 @@ def get_rankings_data(
     """
     boardgame_master_dict = {}
     # Check if there are any ids which have not had all their ratings pulled down yet
-    if rankings_dataframe is not None:
-        df_ratings_len = rankings_dataframe.copy()
+    if ratings_dataframe is not None:
+        df_ratings_len = ratings_dataframe.copy()
         df_ratings_len = df_ratings_len.drop(columns=["game_id"])
         df_ratings_len = df_ratings_len.fillna("")
         for col in df_ratings_len.columns:
             df_ratings_len[col] = df_ratings_len[col].apply(len)
         df_ratings_pulled = pd.DataFrame(
             {
-                "game_id": rankings_dataframe["game_id"].tolist(),
+                "game_id": ratings_dataframe["game_id"].tolist(),
                 "ratings_pulled": df_ratings_len.sum(axis=1).tolist(),
             }
         )
@@ -255,7 +255,7 @@ def get_rankings_data(
         df_missing_ratings = boardgame_data[
             boardgame_data["ratings_pulled"] < boardgame_data["numratings"]
         ]
-        df_ratings_tmp = rankings_dataframe.copy().set_index("game_id")
+        df_ratings_tmp = ratings_dataframe.copy().set_index("game_id")
         df_ratings_tmp.index.name = None
         boardgame_master_dict = df_ratings_tmp.to_dict(orient="index")
 
