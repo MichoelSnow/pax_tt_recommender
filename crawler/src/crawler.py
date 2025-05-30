@@ -126,7 +126,7 @@ def get_boardgame_ranks(cookies: dict, save_file: bool = False):
             logger.info(f"Successfully loaded {len(df_bg_ranks)} boardgames")
             if save_file:
                 df_bg_ranks.to_csv(
-                    f"../../data/boardgame_ranks_{queried_at_utc[:10].replace('-','')}.csv",
+                    f"../../data/crawler/boardgame_ranks_{queried_at_utc[:10].replace('-','')}.csv",
                     index=False,
                     sep="|",
                     escapechar="\\",
@@ -135,9 +135,9 @@ def get_boardgame_ranks(cookies: dict, save_file: bool = False):
             return df_bg_ranks
 
 
-def get_boardgame_raw_data(
+def get_boardgame_data(
     boardgame_ranks: pd.DataFrame,
-    bg_data_raw: pd.DataFrame = None,
+    boardgame_data: pd.DataFrame = None,
     batch_saves: bool = False,
     batch_size: int = 20,
     log_level: str = "INFO",
@@ -148,7 +148,7 @@ def get_boardgame_raw_data(
     
     Args:
         boardgame_ranks (pd.DataFrame): DataFrame from get_boardgame_ranks()
-        bg_data_raw (pd.DataFrame, optional): Existing game data to update
+        boardgame_data (pd.DataFrame, optional): Existing game data to update
         batch_saves (bool): Whether to save data after each batch
         batch_size (int): Number of games to process in each batch. BGG API has a limit of 20 IDs per request.
         log_level (str): Logging level for this function
@@ -160,19 +160,19 @@ def get_boardgame_raw_data(
     current_level = logger.level
     logger.setLevel(getattr(logging, log_level.upper()))
 
-    logger.info(f"Starting to fetch raw data for {len(boardgame_ranks)} boardgames")
+    logger.info(f"Starting to fetch data for {len(boardgame_ranks)} boardgames")
     query_time = int(time())
-    save_path = f"../../data/boardgame_data/boardgame_data_raw_{query_time}.parquet"
+    save_path = f"../../data/crawler/boardgame_data_{query_time}.parquet"
     boardgame_ids = boardgame_ranks["id"].tolist()
     boardgame_master_dict = {}
-    if bg_data_raw is not None:
+    if boardgame_data is not None:
         logger.info("Using existing boardgame data as base")
         boardgame_master_dict = {
-            str(x["game_id"]): x for x in bg_data_raw.to_dict(orient="records")
+            str(x["game_id"]): x for x in boardgame_data.to_dict(orient="records")
         }
         boardgame_ids = list(
             set(boardgame_ids).difference(
-                set(bg_data_raw["game_id"].astype(int).tolist())
+                set(boardgame_data["game_id"].astype(int).tolist())
             )
         )
     logger.info(f"Found {len(boardgame_ids)} new boardgames to process")
@@ -201,24 +201,24 @@ def get_boardgame_raw_data(
 
         if batch_saves:
             logger.info(f"Saving batch {batch_num + 1} data")
-            bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
-            bg_data_raw.to_parquet(save_path)
+            boardgame_data = pd.DataFrame(list(boardgame_master_dict.values()))
+            boardgame_data.to_parquet(save_path)
             logger.info(f"Saved batch {batch_num + 1} data to {save_path}")
         sleep(1)
 
-    bg_data_raw = pd.DataFrame(list(boardgame_master_dict.values()))
+    boardgame_data = pd.DataFrame(list(boardgame_master_dict.values()))
     logger.info("Successfully completed fetching all boardgame data")
-    bg_data_raw.to_parquet(save_path)
+    boardgame_data.to_parquet(save_path)
     logger.info(f"Saved final data to {save_path}")
 
     # Restore original logging level
     logger.setLevel(current_level)
-    return bg_data_raw
+    return boardgame_data
 
 
 def get_ratings_data(
     boardgame_data: pd.DataFrame,
-    ratings_dataframe: pd.DataFrame = None,
+    boardgame_ratings: pd.DataFrame = None,
     batch_saves: bool = False,
     batch_size: int = 20,
 ):
@@ -237,15 +237,15 @@ def get_ratings_data(
     """
     boardgame_master_dict = {}
     # Check if there are any ids which have not had all their ratings pulled down yet
-    if ratings_dataframe is not None:
-        df_ratings_len = ratings_dataframe.copy()
+    if boardgame_ratings is not None:
+        df_ratings_len = boardgame_ratings.copy()
         df_ratings_len = df_ratings_len.drop(columns=["game_id"])
         df_ratings_len = df_ratings_len.fillna("")
         for col in df_ratings_len.columns:
             df_ratings_len[col] = df_ratings_len[col].apply(len)
         df_ratings_pulled = pd.DataFrame(
             {
-                "game_id": ratings_dataframe["game_id"].tolist(),
+                "game_id": boardgame_ratings["game_id"].tolist(),
                 "ratings_pulled": df_ratings_len.sum(axis=1).tolist(),
             }
         )
@@ -255,7 +255,7 @@ def get_ratings_data(
         df_missing_ratings = boardgame_data[
             boardgame_data["ratings_pulled"] < boardgame_data["numratings"]
         ]
-        df_ratings_tmp = ratings_dataframe.copy().set_index("game_id")
+        df_ratings_tmp = boardgame_ratings.copy().set_index("game_id")
         df_ratings_tmp.index.name = None
         boardgame_master_dict = df_ratings_tmp.to_dict(orient="index")
 
@@ -278,7 +278,7 @@ def get_ratings_data(
     )
     boardgame_ids = boardgame_data["game_id"].tolist()
     save_time = int(time())
-    save_path = f"../../data/boardgame_data/boardgame_rating_data_{save_time}.parquet"
+    save_path = f"../../data/crawler/boardgame_ratings_{save_time}.parquet"
     for batch_num in range(math.ceil(len(boardgame_ids) / batch_size)):
         logger.info(
             f"Processing batch {batch_num + 1} of {math.ceil(len(boardgame_ids) / batch_size)}"
