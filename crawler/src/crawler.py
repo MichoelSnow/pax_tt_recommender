@@ -49,7 +49,7 @@ def get_driver_and_cookies():
     """
     Initialize Selenium WebDriver and authenticate with BoardGameGeek.
     Returns authentication cookies needed for subsequent API requests.
-    
+
     Returns:
         dict: Authentication cookies for BGG API requests
     """
@@ -104,11 +104,11 @@ def get_driver_and_cookies():
 def get_boardgame_ranks(cookies: dict, save_file: bool = False):
     """
     Download the current board game rankings from BGG.
-    
+
     Args:
         cookies (dict): Authentication cookies from get_driver_and_cookies()
         save_file (bool): Whether to save the rankings to a CSV file
-        
+
     Returns:
         pd.DataFrame: DataFrame containing board game rankings
     """
@@ -145,14 +145,14 @@ def get_boardgame_data(
     """
     Fetch detailed information for each board game from BGG API.
     The BGG API has a limit of 20 IDs per request, so we process in batches.
-    
+
     Args:
         boardgame_ranks (pd.DataFrame): DataFrame from get_boardgame_ranks()
         boardgame_data (pd.DataFrame, optional): Existing game data to update
         batch_saves (bool): Whether to save data after each batch
         batch_size (int): Number of games to process in each batch. BGG API has a limit of 20 IDs per request.
         log_level (str): Logging level for this function
-        
+
     Returns:
         pd.DataFrame: DataFrame containing detailed game information
     """
@@ -225,17 +225,21 @@ def get_ratings_data(
     """
     Fetch user ratings and comments for each board game.
     Processes games in batches and handles pagination of ratings.
-    
+
     Args:
         boardgame_data (pd.DataFrame): DataFrame from get_boardgame_raw_data()
         ratings_dataframe (pd.DataFrame, optional): Existing ratings data to update
         batch_saves (bool): Whether to save data after each batch
         batch_size (int): Number of games to process in each batch. BGG API has a limit of 20 IDs per request.
-        
+
     Returns:
         pd.DataFrame: DataFrame containing user ratings and comments
     """
     boardgame_master_dict = {}
+    boardgame_data = boardgame_data.loc[boardgame_data["numratings"] > 0].sort_values(
+        by="numratings", ascending=False
+    )
+    boardgame_ids = boardgame_data["game_id"].tolist()
     # Check if there are any ids which have not had all their ratings pulled down yet
     if boardgame_ratings is not None:
         df_ratings_len = boardgame_ratings.copy()
@@ -252,9 +256,19 @@ def get_ratings_data(
         boardgame_data = boardgame_data.merge(
             df_ratings_pulled, on="game_id", how="left"
         )
-        df_missing_ratings = boardgame_data[
-            boardgame_data["ratings_pulled"] < boardgame_data["numratings"]
+        completed_ids = boardgame_data.loc[
+            boardgame_data["ratings_pulled"] >= (boardgame_data["numratings"]-1), "game_id"
+        ].tolist()
+        logger.info(
+            f"Found {len(completed_ids)} boardgames with all ratings already pulled to completion"
+        )
+        boardgame_ids = list(set(boardgame_ids).difference(set(completed_ids)))
+        df_missing_ratings = boardgame_data.loc[
+            boardgame_data["ratings_pulled"] < (boardgame_data["numratings"]-1)
         ]
+        logger.info(
+            f"Found {df_missing_ratings.shape[0]} boardgames with missing ratings"
+        )
         df_ratings_tmp = boardgame_ratings.copy().set_index("game_id")
         df_ratings_tmp.index.name = None
         boardgame_master_dict = df_ratings_tmp.to_dict(orient="index")
@@ -273,12 +287,18 @@ def get_ratings_data(
                 start_page=start_page,
                 batch_saves=batch_saves,
             )
-    boardgame_data = boardgame_data.loc[boardgame_data["numratings"] > 0].sort_values(
-        by="numratings", ascending=False
-    )
-    boardgame_ids = boardgame_data["game_id"].tolist()
+            df_ratings = (
+                pd.DataFrame()
+                .from_dict(data=boardgame_master_dict, orient="index")
+                .reset_index(names="game_id")
+            )
+            boardgame_ids = list(set(boardgame_ids).difference(set(df_ratings["game_id"].tolist())))
+
     save_time = int(time())
     save_path = f"../../data/crawler/boardgame_ratings_{save_time}.parquet"
+    logger.info(
+        f"Starting to fetch ratings for {len(boardgame_ids)} boardgames"
+    )
     for batch_num in range(math.ceil(len(boardgame_ids) / batch_size)):
         logger.info(
             f"Processing batch {batch_num + 1} of {math.ceil(len(boardgame_ids) / batch_size)}"
@@ -331,7 +351,7 @@ def iterate_through_ratings_pages(
 ):
     """
     Helper function to iterate through paginated rating data from BGG API.
-    
+
     Args:
         boardgame_master_dict (dict): Dictionary to store rating data
         max_ratings_page (int): Maximum number of rating pages to process. Derived from the number of ratings for each game.
@@ -339,7 +359,7 @@ def iterate_through_ratings_pages(
         start_page (int): Page number to start processing from
         batch_saves (bool): Whether to save data periodically
         save_path (str): Path to save data to
-        
+
     Returns:
         dict: Updated dictionary containing rating data
     """
@@ -380,10 +400,10 @@ def iterate_through_ratings_pages(
 def extract_basic_game_info(game_xml: bs4.element.Tag):
     """
     Extract basic game information from BGG XML response.
-    
+
     Args:
         game_xml (bs4.element.Tag): BeautifulSoup XML element for a game
-        
+
     Returns:
         dict: Dictionary containing basic game information
     """
@@ -447,11 +467,11 @@ def extract_basic_game_info(game_xml: bs4.element.Tag):
 def extract_polls(game_dict: dict, game_xml: bs4.element.Tag):
     """
     Extract poll data (player age recommendations and language dependence) from BGG XML.
-    
+
     Args:
         game_dict (dict): Dictionary to store poll data
         game_xml (bs4.element.Tag): BeautifulSoup XML element for a game
-        
+
     Returns:
         dict: Updated dictionary containing poll data
     """
@@ -499,11 +519,11 @@ def extract_polls(game_dict: dict, game_xml: bs4.element.Tag):
 def extract_poll_player_count(game_dict: dict, game_xml: bs4.element.Tag):
     """
     Extract player count recommendations from BGG XML.
-    
+
     Args:
         game_dict (dict): Dictionary to store player count data
         game_xml (bs4.element.Tag): BeautifulSoup XML element for a game
-        
+
     Returns:
         dict: Updated dictionary containing player count recommendations
     """
@@ -535,11 +555,11 @@ def extract_poll_player_count(game_dict: dict, game_xml: bs4.element.Tag):
 def extract_version_info(game_dict: dict, game_xml: bs4.element.Tag):
     """
     Extract version information (editions, dimensions, etc.) from BGG XML.
-    
+
     Args:
         game_dict (dict): Dictionary to store version data
         game_xml (bs4.element.Tag): BeautifulSoup XML element for a game
-        
+
     Returns:
         dict: Updated dictionary containing version information
     """
@@ -582,13 +602,13 @@ def extract_version_info(game_dict: dict, game_xml: bs4.element.Tag):
 def extract_ratings(game_dict: dict, game_xml: bs4.element.Tag):
     """
     Extract user ratings from BGG XML.
-    
+
     Args:
         game_dict (dict): Dictionary to store rating data
         game_xml (bs4.element.Tag): BeautifulSoup XML element for a game
-        
+
     Returns:
-        dict: Updated dictionary containing user ratings 
+        dict: Updated dictionary containing user ratings
     """
     ratings_list = game_xml.find_all("comment")
     for rating in ratings_list:
