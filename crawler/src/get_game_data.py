@@ -22,7 +22,7 @@ from time import sleep, time
 from pathlib import Path
 import json
 import argparse
-
+import bs4
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -30,6 +30,7 @@ logging.basicConfig(
     handlers=[logging.FileHandler("get_game_data.log"), logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
+
 
 def get_boardgame_data(
     boardgame_ranks: pd.DataFrame,
@@ -61,21 +62,21 @@ def get_boardgame_data(
     data_dir = Path(__file__).parent.parent.parent / "data" / "crawler"
     data_dir.mkdir(parents=True, exist_ok=True)
     save_path = data_dir / f"boardgame_data_{query_time}.parquet"
-    
+
     boardgame_ids = boardgame_ranks["id"].tolist()
     boardgame_master_dict = {}
     if boardgame_data is not None:
         logger.info("Using existing boardgame data as base")
         boardgame_master_dict = {
-            str(x["game_id"]): x for x in boardgame_data.to_dict(orient="records")
+            str(x["id"]): x for x in boardgame_data.to_dict(orient="records")
         }
         boardgame_ids = list(
             set(boardgame_ids).difference(
-                set(boardgame_data["game_id"].astype(int).tolist())
+                set(boardgame_data["id"].astype(int).tolist())
             )
         )
     logger.info(f"Found {len(boardgame_ids)} new boardgames to process")
-    
+
     for batch_num in range(math.ceil(len(boardgame_ids) / batch_size)):
         logger.info(
             f"Processing batch {batch_num + 1} of {math.ceil(len(boardgame_ids) / batch_size)}"
@@ -83,17 +84,21 @@ def get_boardgame_data(
         batch_ids = boardgame_ids[batch_num * batch_size : (batch_num + 1) * batch_size]
         batch_ids = [str(x) for x in batch_ids]
         logger.debug(f"Processing boardgame IDs: {batch_ids}")
-        bg_info_url = f"https://www.boardgamegeek.com/xmlapi2/thing?type=boardgame&stats=1&versions=1&ratingcomments=1&pagesize=100&page=1&id={','.join(batch_ids)}"
+        bg_info_url = f"https://www.boardgamegeek.com/xmlapi2/thing?type=boardgame,boardgameexpansion&stats=1&versions=1&ratingcomments=1&pagesize=100&page=1&id={','.join(batch_ids)}"
         bgg_response = requests.get(bg_info_url)
         soup_xml = BeautifulSoup(bgg_response.content, "xml")
-        games_xml_list = soup_xml.find_all("item", attrs={"type": "boardgame"})
-        
+        games_xml_list = soup_xml.find_all(
+            "item", attrs={"type": ["boardgame", "boardgameexpansion"]}
+        )
+
         for game_xml in games_xml_list:
             game_dict = extract_basic_game_info(game_xml=game_xml)
             game_dict = extract_polls(game_dict=game_dict, game_xml=game_xml)
-            game_dict = extract_poll_player_count(game_dict=game_dict, game_xml=game_xml)
+            game_dict = extract_poll_player_count(
+                game_dict=game_dict, game_xml=game_xml
+            )
             game_dict = extract_version_info(game_dict=game_dict, game_xml=game_xml)
-            boardgame_master_dict[game_dict["game_id"]] = game_dict
+            boardgame_master_dict[game_dict["id"]] = game_dict
             logger.debug(f"Completed processing game ID: {game_xml['id']}")
 
         if batch_saves:
@@ -112,11 +117,12 @@ def get_boardgame_data(
     logger.setLevel(current_level)
     return boardgame_data
 
-def extract_basic_game_info(game_xml: BeautifulSoup.Tag):
+
+def extract_basic_game_info(game_xml: bs4.element.Tag):
     """Extract basic game information from BGG XML response."""
     logger.debug(f"Extracting basic game info for {game_xml['id']}")
     game_dict = {
-        "game_id": game_xml["id"],
+        "id": int(game_xml["id"]),
     }
     if game_xml.find("image") is not None:
         game_dict["thumbnail"] = game_xml.find("thumbnail").text
@@ -145,9 +151,10 @@ def extract_basic_game_info(game_xml: BeautifulSoup.Tag):
         "boardgameintegration",
     ]
     for categ in link_categ:
-        game_dict[categ] = [
-            x["value"] for x in game_xml.find_all("link", {"type": categ})
-        ]
+        game_dict[categ] = {
+            int(x["id"]): x["value"]
+            for x in game_xml.find_all("link", {"type": categ}, recursive=False)
+        }
     stats_float = ["stddev", "median", "averageweight"]
     for stat in stats_float:
         if game_xml.find(stat) is not None:
@@ -170,7 +177,8 @@ def extract_basic_game_info(game_xml: BeautifulSoup.Tag):
     logger.debug(f"Successfully extracted basic game info for {game_xml['id']}")
     return game_dict
 
-def extract_polls(game_dict: dict, game_xml: BeautifulSoup.Tag):
+
+def extract_polls(game_dict: dict, game_xml: bs4.element.Tag):
     """Extract poll data from BGG XML."""
     logger.debug(f"Extracting polls for {game_xml['id']}")
     for poll_name in ["suggested_playerage", "language_dependence"]:
@@ -212,7 +220,8 @@ def extract_polls(game_dict: dict, game_xml: BeautifulSoup.Tag):
     logger.debug(f"Successfully extracted polls for {game_xml['id']}")
     return game_dict
 
-def extract_poll_player_count(game_dict: dict, game_xml: BeautifulSoup.Tag):
+
+def extract_poll_player_count(game_dict: dict, game_xml: bs4.element.Tag):
     """Extract player count recommendations from BGG XML."""
     logger.debug(f"Extracting player count poll for {game_xml['id']}")
     player_count_poll = game_xml.find("poll", attrs={"name": "suggested_numplayers"})
@@ -238,7 +247,8 @@ def extract_poll_player_count(game_dict: dict, game_xml: BeautifulSoup.Tag):
     logger.debug(f"Successfully extracted player count poll for {game_xml['id']}")
     return game_dict
 
-def extract_version_info(game_dict: dict, game_xml: BeautifulSoup.Tag):
+
+def extract_version_info(game_dict: dict, game_xml: bs4.element.Tag):
     """Extract version information from BGG XML."""
     logger.debug(f"Extracting version info for {game_xml['id']}")
     version_items = game_xml.find_all("item", attrs={"type": "boardgameversion"})
@@ -275,6 +285,7 @@ def extract_version_info(game_dict: dict, game_xml: BeautifulSoup.Tag):
     logger.debug(f"Successfully extracted version info for {game_xml['id']}")
     return game_dict
 
+
 def main():
     """Main function to get board game data."""
     try:
@@ -292,13 +303,13 @@ def main():
         ranks_files = list(data_dir.glob("boardgame_ranks_*.csv"))
         if not ranks_files:
             raise FileNotFoundError("No rankings files found")
-        
+
         latest_ranks = max(ranks_files, key=lambda x: x.stat().st_mtime)
         logger.info(f"Using rankings file: {latest_ranks}")
-        
+
         # Read rankings
         df_ranks = pd.read_csv(latest_ranks, sep="|", escapechar="\\")
-        
+
         # Get existing game data if continuing
         existing_data = None
         if args.continue_from_last:
@@ -307,15 +318,18 @@ def main():
                 latest_games = max(game_files, key=lambda x: x.stat().st_mtime)
                 logger.info(f"Continuing from game data file: {latest_games}")
                 existing_data = pd.read_parquet(latest_games)
-        
+
         # Get game data
-        df_games = get_boardgame_data(df_ranks, boardgame_data=existing_data, batch_saves=True)
+        df_games = get_boardgame_data(
+            df_ranks, boardgame_data=existing_data, batch_saves=True
+        )
         logger.info("Successfully completed getting board game data")
         return df_games
-        
+
     except Exception as e:
         logger.error(f"Error getting board game data: {str(e)}")
         raise
 
+
 if __name__ == "__main__":
-    main() 
+    main()
