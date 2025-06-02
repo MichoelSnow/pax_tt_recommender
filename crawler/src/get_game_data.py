@@ -229,6 +229,7 @@ def extract_poll_player_count(game_dict: dict, game_xml: bs4.element.Tag):
     if result_dict["total_votes"] == 0:
         game_dict["player_count_recs"] = {}
         game_dict["suggested_numplayers"] = {}
+        logger.debug(f"Missing player count poll for {game_xml['id']}")
         return game_dict
     player_count_results = player_count_poll.find_all("results")
     game_dict["player_count_recs"] = {}
