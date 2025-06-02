@@ -226,6 +226,10 @@ def extract_poll_player_count(game_dict: dict, game_xml: bs4.element.Tag):
     logger.debug(f"Extracting player count poll for {game_xml['id']}")
     player_count_poll = game_xml.find("poll", attrs={"name": "suggested_numplayers"})
     result_dict = {"total_votes": int(player_count_poll.attrs["totalvotes"])}
+    if result_dict["total_votes"] == 0:
+        game_dict["player_count_recs"] = {}
+        game_dict["suggested_numplayers"] = {}
+        return game_dict
     player_count_results = player_count_poll.find_all("results")
     game_dict["player_count_recs"] = {}
     for player_count in player_count_results:
