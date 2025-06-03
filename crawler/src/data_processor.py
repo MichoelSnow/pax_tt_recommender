@@ -27,104 +27,6 @@ SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
 
 
-def process_game_data(game_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Process a single game's data into the format expected by the backend.
-
-    Args:
-        game_dict (Dict[str, Any]): Raw game data from crawler
-
-    Returns:
-        Dict[str, Any]: Processed game data matching backend schema
-    """
-    try:
-        # Handle versions - convert None to empty list
-        # versions = game_dict.get("versions")
-        # if versions is None:
-        #     versions = []
-
-        processed = {
-            # "id": game_dict.get("id"),
-            # "name": game_dict.get("name", ""),
-            # "thumbnail": game_dict.get("thumbnail"),
-            # "image": game_dict.get("image"),
-            # "minplayers": game_dict.get("minplayers"),
-            # "maxplayers": game_dict.get("maxplayers"),
-            # "playingtime": game_dict.get("playingtime"),
-            # "minplaytime": game_dict.get("minplaytime"),
-            # "maxplaytime": game_dict.get("maxplaytime"),
-            # "minage": game_dict.get("minage"),
-            # "year_published": game_dict.get("yearpublished"),
-            # "average_rating": game_dict.get("average"),
-            # "num_ratings": game_dict.get("numratings"),
-            # "num_comments": game_dict.get("numcomments"),
-            # "num_weights": game_dict.get("numweights"),
-            # "average_weight": game_dict.get("averageweight"),
-            # "stddev": game_dict.get("stddev"),
-            # "median": game_dict.get("median"),
-            # "owned": game_dict.get("owned"),
-            # "trading": game_dict.get("trading"),
-            # "wanting": game_dict.get("wanting"),
-            # "wishing": game_dict.get("wishing"),
-            # "bayes_average": game_dict.get("bayesaverage"),
-            # "is_expansion": bool(game_dict.get("is_expansion", False)),
-            # # Ranking fields - allow null values for missing ranks
-            # "rank": game_dict.get("rank"),
-            # "abstracts_rank": game_dict.get("abstracts_rank"),
-            # "cgs_rank": game_dict.get("cgs_rank"),
-            # "childrensgames_rank": game_dict.get("childrensgames_rank"),
-            # "familygames_rank": game_dict.get("familygames_rank"),
-            # "partygames_rank": game_dict.get("partygames_rank"),
-            # "strategygames_rank": game_dict.get("strategygames_rank"),
-            # "thematic_rank": game_dict.get("thematic_rank"),
-            # "wargames_rank": game_dict.get("wargames_rank"),
-            # Related entities
-            # "mechanics": [{"name": m} for m in game_dict.get("boardgamemechanic", [])],
-            # "categories": [{"name": c} for c in game_dict.get("boardgamecategory", [])],
-            # "designers": [{"name": d} for d in game_dict.get("boardgamedesigner", [])],
-            # "artists": [{"name": a} for a in game_dict.get("boardgameartist", [])],
-            # "publishers": [
-            #     {"name": p} for p in game_dict.get("boardgamepublisher", [])
-            # ],
-            "suggested_playerage": game_dict.get("suggested_playerage"),
-            "suggested_playerage_quartiles": game_dict.get(
-                "suggested_playerage_quartiles"
-            ),
-            "language_dependence": game_dict.get("language_dependence"),
-            "language_dependence_quartiles": game_dict.get(
-                "language_dependence_quartiles"
-            ),
-            # "suggested_numplayers": game_dict.get("suggested_numplayers"),
-            # "player_count_recs": game_dict.get("player_count_recs"),
-            # "versions": [
-            #     {
-            #         "version_id": v.get("version_id"),
-            #         "name": v.get("version_nickname"),
-            #         "year_published": v.get("year_published"),
-            #         "language": v.get("language"),
-            #         "width": v.get("width"),
-            #         "length": v.get("length"),
-            #         "depth": v.get("depth"),
-            #         "thumbnail": v.get("thumbnail"),
-            #         "image": v.get("image")
-            #     }
-            #     for v in versions
-            # ]
-        }
-        return processed
-    except Exception as e:
-        # Find which field caused the error
-        for field, value in game_dict.items():
-            try:
-                if isinstance(value, (int, float)) and pd.isna(value):
-                    raise ValueError(f"Field '{field}' contains NaN value")
-            except Exception:
-                pass
-        raise ValueError(
-            f"Error processing game {game_dict.get('game_id', 'unknown')}: {str(e)}"
-        )
-
-
 def save_basic_info(
     df_merged: pd.DataFrame, output_file_base: str, timestamp: int
 ) -> None:
@@ -451,26 +353,6 @@ def combine_crawler_data(
 
     # Save the language dependence
     save_language_dependence(df_merged, output_file_base, timestamp)
-
-    # # Convert data to dictionaries
-    # games_data = df_merged.to_dict(orient="records")
-
-    # # Process each game's data
-    # processed_games = []
-    # for game in games_data:
-    #     processed = process_game_data(game)
-    #     processed_games.append(processed)
-
-    # # Save the processed data
-    # try:
-    #     with open(output_file, "w") as f:
-    #         json.dump(processed_games, f, indent=2)
-    #     logger.info(
-    #         f"Successfully saved {len(processed_games)} processed games to {output_file}"
-    #     )
-    # except Exception as e:
-    #     logger.error(f"Error saving output file: {str(e)}")
-    #     raise
 
 
 def main():
