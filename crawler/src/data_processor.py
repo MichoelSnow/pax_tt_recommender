@@ -6,11 +6,9 @@ It combines board game rankings and detailed game data into a format that matche
 """
 
 import pandas as pd
-import json
 from pathlib import Path
 from typing import Dict, List, Any
 import logging
-import os
 import time
 import csv
 
@@ -79,6 +77,9 @@ def save_basic_info(
         "image",
     ]
 
+    # Games with rank 0 should be nan
+    df_merged.loc[df_merged["rank"] == 0, "rank"] = pd.NA
+
     # Covert columns to int
     for col in int_cols:
         df_merged[col] = df_merged[col].fillna(value=pd.NA).astype(pd.Int64Dtype())
@@ -86,6 +87,7 @@ def save_basic_info(
     # Convert columns to float
     for col in float_cols:
         df_merged[col] = df_merged[col].fillna(value=pd.NA).astype(pd.Float64Dtype())
+
 
     # Save the int, float, and str columns to csv
     output_file_data = f"{output_file_base}_data_{timestamp}.csv"
