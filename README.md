@@ -94,6 +94,31 @@ python crawler/src/get_game_data.py --continue-from-last
 python crawler/src/get_ratings.py --continue-from-last
 ```
 
+### 4. Process the Data
+
+```bash
+python crawler/src/data_processor.py
+```
+
+This will:
+- Combine rankings and detailed game data
+- Process relationships (mechanics, categories, etc.)
+- Generate multiple CSV files in `data/processed/`:
+  - `processed_games_data_TIMESTAMP.csv` - Basic game info
+  - `processed_games_boardgamecategory_TIMESTAMP.csv` - Categories
+  - `processed_games_boardgamemechanic_TIMESTAMP.csv` - Mechanics
+  - `processed_games_boardgamedesigner_TIMESTAMP.csv` - Designers
+  - `processed_games_boardgameartist_TIMESTAMP.csv` - Artists
+  - `processed_games_boardgamepublisher_TIMESTAMP.csv` - Publishers
+  - `processed_games_boardgamefamily_TIMESTAMP.csv` - Game families
+  - `processed_games_boardgameexpansion_TIMESTAMP.csv` - Expansions
+  - `processed_games_boardgamecompilation_TIMESTAMP.csv` - Compilations
+  - `processed_games_boardgameimplementation_TIMESTAMP.csv` - Implementations
+  - `processed_games_boardgameintegration_TIMESTAMP.csv` - Integrations
+  - `processed_games_suggested_num_players_TIMESTAMP.csv` - Player recommendations
+  - `processed_games_language_dependence_TIMESTAMP.csv` - Language dependence
+  - `processed_games_versions_TIMESTAMP.csv` - Game versions
+
 ## Importing Data to Backend
 
 Make sure you're in the Poetry shell first:
@@ -109,9 +134,16 @@ python backend/app/import_data.py
 ```
 
 This will:
-- Find the most recent processed games file
+- Find the most recent processed games files
 - Import all games and related entities into the database
+- Process data in batches of 200 games
 - Log progress to `import_data.log`
+
+You can also delete the existing database before import:
+
+```bash
+python backend/app/import_data.py --delete-existing
+```
 
 ## Running the Development Servers
 
