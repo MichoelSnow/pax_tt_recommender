@@ -56,10 +56,7 @@ def get_games(
 
         if players:
             query = query.join(models.BoardGame.suggested_players).filter(
-                and_(
-                    models.SuggestedPlayer.min_players <= players,
-                    models.SuggestedPlayer.max_players >= players
-                )
+                models.SuggestedPlayer.player_count == players
             )
 
         if recommendations:
@@ -67,17 +64,15 @@ def get_games(
             if 'best' in rec_list:
                 query = query.join(models.BoardGame.suggested_players).filter(
                     and_(
-                        models.SuggestedPlayer.min_players <= players,
-                        models.SuggestedPlayer.max_players >= players,
-                        models.SuggestedPlayer.best == True
+                        models.SuggestedPlayer.player_count == players,
+                        models.SuggestedPlayer.recommendation == 'best'
                     )
                 )
             if 'recommended' in rec_list:
                 query = query.join(models.BoardGame.suggested_players).filter(
                     and_(
-                        models.SuggestedPlayer.min_players <= players,
-                        models.SuggestedPlayer.max_players >= players,
-                        models.SuggestedPlayer.recommended == True
+                        models.SuggestedPlayer.player_count == players,
+                        models.SuggestedPlayer.recommendation == 'recommended'
                     )
                 )
 
