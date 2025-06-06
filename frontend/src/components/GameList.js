@@ -21,6 +21,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import debounce from 'lodash/debounce';
+import GameDetails from './GameDetails';
 
 const GameList = () => {
   const [games, setGames] = useState([]);
@@ -32,12 +33,37 @@ const GameList = () => {
     best: false,
     recommended: false
   });
+  const [weight, setWeight] = useState({
+    beginner: false,
+    midweight: false,
+    heavy: false
+  });
   const [mechanics, setMechanics] = useState([]);
   const [selectedMechanics, setSelectedMechanics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
+  const [selectedGame, setSelectedGame] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [sortBy, setSortBy] = useState('rank');
   const gamesPerPage = 10;
+
+  const sortOptions = [
+    { value: 'rank', label: 'Overall Rank' },
+    { value: 'abstracts_rank', label: 'Abstract Games' },
+    { value: 'cgs_rank', label: 'Customizable Games' },
+    { value: 'childrens_games_rank', label: "Children's Games" },
+    { value: 'family_games_rank', label: 'Family Games' },
+    { value: 'party_games_rank', label: 'Party Games' },
+    { value: 'strategy_games_rank', label: 'Strategy Games' },
+    { value: 'thematic_rank', label: 'Thematic Games' },
+    { value: 'wargames_rank', label: 'Wargames' }
+  ];
+
+  const getRankLabel = (sortValue) => {
+    const option = sortOptions.find(opt => opt.value === sortValue);
+    return option ? option.label : 'Rank';
+  };
 
   // Generate player count options (1-12)
   const playerCountOptions = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -54,13 +80,14 @@ const GameList = () => {
     fetchMechanics();
   }, []);
 
-  const searchGames = async (term, players, recs, mechs) => {
+  const searchGames = async (term, players, recs, mechs, weightFilter, sort) => {
     try {
       setLoading(true);
       const params = {
         search: term || undefined,
         limit: gamesPerPage,
-        skip: 0
+        skip: 0,
+        sort_by: sort
       };
 
       if (players) {
@@ -75,26 +102,48 @@ const GameList = () => {
         params.recommendations = activeRecommendations.join(',');
       }
 
+      const activeWeights = Object.entries(weightFilter)
+        .filter(([_, checked]) => checked)
+        .map(([key]) => key);
+      
+      if (activeWeights.length > 0) {
+        params.weight = activeWeights.join(',');
+      }
+
       if (mechs.length > 0) {
         params.mechanics = mechs.map(m => m.name).join(',');
       }
 
-      const response = await axios.get('http://localhost:8000/games/', { params });
+      const response = await axios.get('http://localhost:8000/games', { params });
       setGames(response.data);
       setFilteredGames(response.data);
       setDisplayedGames(response.data);
       setPage(1);
       setLoading(false);
     } catch (err) {
-      setError('Failed to search games. Please try again later.');
+      console.error('Search error:', err);
+      if (err.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Error response:', err.response.data);
+        setError(`Error: ${err.response.data.detail || 'Failed to search games. Please try again later.'}`);
+      } else if (err.request) {
+        // The request was made but no response was received
+        console.error('No response received:', err.request);
+        setError('No response from server. Please check if the backend is running.');
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error setting up request:', err.message);
+        setError('Failed to search games. Please try again later.');
+      }
       setLoading(false);
     }
   };
 
   // Create a debounced version of the search function
   const debouncedSearch = useCallback(
-    debounce((term, players, recs, mechs) => {
-      searchGames(term, players, recs, mechs);
+    debounce((term, players, recs, mechs, weightFilter, sort) => {
+      searchGames(term, players, recs, mechs, weightFilter, sort);
     }, 500),
     []
   );
@@ -104,7 +153,8 @@ const GameList = () => {
       try {
         const params = {
           skip: 0,
-          limit: gamesPerPage
+          limit: gamesPerPage,
+          sort_by: sortBy
         };
 
         if (playerCount) {
@@ -119,16 +169,25 @@ const GameList = () => {
           params.recommendations = activeRecommendations.join(',');
         }
 
+        const activeWeights = Object.entries(weight)
+          .filter(([_, checked]) => checked)
+          .map(([key]) => key);
+        
+        if (activeWeights.length > 0) {
+          params.weight = activeWeights.join(',');
+        }
+
         if (selectedMechanics.length > 0) {
           params.mechanics = selectedMechanics.map(m => m.name).join(',');
         }
 
-        const response = await axios.get('http://localhost:8000/games/', { params });
+        const response = await axios.get('http://localhost:8000/games', { params });
         setGames(response.data);
         setFilteredGames(response.data);
         setDisplayedGames(response.data);
         setLoading(false);
       } catch (err) {
+        console.error('Fetch error:', err);
         setError('Failed to fetch games. Please try again later.');
         setLoading(false);
       }
@@ -139,12 +198,12 @@ const GameList = () => {
 
   // Update search when any filter changes
   useEffect(() => {
-    debouncedSearch(searchTerm, playerCount, recommendations, selectedMechanics);
+    debouncedSearch(searchTerm, playerCount, recommendations, selectedMechanics, weight, sortBy);
     // Cleanup function to cancel any pending debounced calls
     return () => {
       debouncedSearch.cancel();
     };
-  }, [searchTerm, playerCount, recommendations, selectedMechanics, debouncedSearch]);
+  }, [searchTerm, playerCount, recommendations, selectedMechanics, weight, sortBy, debouncedSearch]);
 
   const loadMore = async () => {
     try {
@@ -171,7 +230,7 @@ const GameList = () => {
         params.mechanics = selectedMechanics.map(m => m.name).join(',');
       }
 
-      const response = await axios.get('http://localhost:8000/games/', { params });
+      const response = await axios.get('http://localhost:8000/games', { params });
       
       if (response.data.length > 0) {
         const newGames = [...games, ...response.data];
@@ -190,6 +249,23 @@ const GameList = () => {
       ...recommendations,
       [event.target.name]: event.target.checked
     });
+  };
+
+  const handleWeightChange = (event) => {
+    setWeight({
+      ...weight,
+      [event.target.name]: event.target.checked
+    });
+  };
+
+  const handleGameClick = async (game) => {
+    try {
+      const response = await axios.get(`http://localhost:8000/games/${game.id}`);
+      setSelectedGame(response.data);
+      setDetailsOpen(true);
+    } catch (err) {
+      setError('Failed to fetch game details. Please try again later.');
+    }
   };
 
   if (loading) {
@@ -212,17 +288,41 @@ const GameList = () => {
     <Container>
       <Box sx={{ my: 4, display: 'flex', gap: 4 }}>
         <Box sx={{ flex: 1 }}>
-          <TextField
-            fullWidth
-            label="Search games"
-            variant="outlined"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ mb: 4 }}
-          />
+          <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
+            <TextField
+              fullWidth
+              label="Search games"
+              variant="outlined"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <FormControl sx={{ minWidth: 200 }}>
+              <InputLabel>Sort By Rank</InputLabel>
+              <Select
+                value={sortBy}
+                label="Sort By Rank"
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                {sortOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {displayedGames.map((game) => (
-              <Card key={game.id}>
+              <Card 
+                key={game.id}
+                onClick={() => handleGameClick(game)}
+                sx={{ 
+                  cursor: 'pointer',
+                  '&:hover': {
+                    backgroundColor: 'action.hover'
+                  }
+                }}
+              >
                 <Box sx={{ display: 'flex', p: 2 }}>
                   {game.image && (
                     <Box
@@ -244,7 +344,7 @@ const GameList = () => {
                       {game.name}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Rank: {game.rank || 'Unranked'}
+                      {getRankLabel(sortBy)}: {game[sortBy] || 'Unranked'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Published: {game.year_published || 'Unknown'}
@@ -308,6 +408,43 @@ const GameList = () => {
               />
             </FormGroup>
           </FormControl>
+          <FormControl component="fieldset" sx={{ mb: 2 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Game Weight
+            </Typography>
+            <FormGroup>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={weight.beginner}
+                    onChange={handleWeightChange}
+                    name="beginner"
+                  />
+                }
+                label="Beginner Friendly (≤ 2.0)"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={weight.midweight}
+                    onChange={handleWeightChange}
+                    name="midweight"
+                  />
+                }
+                label="Midweight (2.0 - 4.0)"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={weight.heavy}
+                    onChange={handleWeightChange}
+                    name="heavy"
+                  />
+                }
+                label="Heavy Cardboard (≥ 4.0)"
+              />
+            </FormGroup>
+          </FormControl>
           <Divider sx={{ my: 2 }} />
           <FormControl fullWidth>
             <Typography variant="subtitle1" gutterBottom>
@@ -343,6 +480,11 @@ const GameList = () => {
           </FormControl>
         </Box>
       </Box>
+      <GameDetails
+        game={selectedGame}
+        open={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+      />
     </Container>
   );
 };
