@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from app import models
+from . import models
 
 def get_recommendations(game_id: int, db: Session, limit: int = 5):
     target_ratings = db.query(models.UserRating).filter(models.UserRating.game_id == game_id).all()
