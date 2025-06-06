@@ -13,6 +13,19 @@ import {
   Paper,
 } from '@mui/material';
 
+// Helper function to decode HTML entities and preserve line breaks
+const decodeHtmlEntities = (text) => {
+  if (!text) return '';
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  // Convert HTML line breaks to newlines and preserve them
+  return textarea.value
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/&#10;/g, '\n')
+    .replace(/&#13;/g, '\n')
+    .replace(/&nbsp;/g, ' ');
+};
+
 const GameDetails = ({ game, open, onClose, onFilter }) => {
   if (!game) return null;
 
@@ -145,7 +158,7 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
             <Typography variant="subtitle1" gutterBottom>
               Rankings
             </Typography>
-            <Paper sx={{ p: 2 }}>
+            <Paper sx={{ p: 2, mb: 2 }}>
               <Grid container spacing={1}>
                 {rankCategories.map((category) => (
                   <Grid item xs={12} sm={6} key={category.value}>
@@ -156,6 +169,19 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
                 ))}
               </Grid>
             </Paper>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle1" gutterBottom>
+              Description
+            </Typography>
+            <Typography 
+              variant="body1" 
+              sx={{ 
+                whiteSpace: 'pre-line',
+                mb: 2
+              }}
+            >
+              {decodeHtmlEntities(game.description)}
+            </Typography>
           </Grid>
         </Grid>
       </DialogContent>

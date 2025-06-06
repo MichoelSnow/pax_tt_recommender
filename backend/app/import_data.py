@@ -36,6 +36,7 @@ def create_game_record(game_data: pd.Series) -> models.BoardGame:
     game_create = schemas.BoardGameCreate(
         id=game_data["id"],
         name=game_data["name"],
+        description=None if pd.isna(game_data["description"]) else game_data["description"],
         rank=None if pd.isna(game_data["rank"]) else int(game_data["rank"]),
         thumbnail=None if pd.isna(game_data["thumbnail"]) else game_data["thumbnail"],
         image=None if pd.isna(game_data["image"]) else game_data["image"],

@@ -126,6 +126,7 @@ class VersionBase(BaseModel):
 class BoardGameBase(BaseModel):
     id: int
     name: str
+    description: Optional[str]
     thumbnail: Optional[str]
     image: Optional[str]
     min_players: Optional[int]
