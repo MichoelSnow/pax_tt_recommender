@@ -5,6 +5,9 @@ from typing import List, Optional
 from . import models, schemas, crud, recommender
 from .database import SessionLocal, engine
 from .import_data import import_all_data
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 models.Base.metadata.create_all(bind=engine)
@@ -21,6 +24,20 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": str(exc.detail)},
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": str(exc)},
+    )
+
 def get_db():
     db = SessionLocal()
     try:
@@ -29,6 +46,7 @@ def get_db():
         db.close()
 
 @app.get("/games", response_model=List[schemas.BoardGameOut])
+@app.get("/games/", response_model=List[schemas.BoardGameOut])
 def list_games(
     skip: int = 0,
     limit: int = 100,
@@ -40,9 +58,17 @@ def list_games(
     search: Optional[str] = None,
     players: Optional[int] = None,
     recommendations: Optional[str] = None,
+    weight: Optional[str] = None,
+    sort_by: Optional[str] = "rank",
     db: Session = Depends(get_db)
 ):
-    return crud.get_games(db, skip, limit, designer, mechanic, mechanics, category, publisher, search, players, recommendations)
+    try:
+        return crud.get_games(db, skip, limit, designer, mechanic, mechanics, category, publisher, search, players, recommendations, weight, sort_by)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error in list_games endpoint: {str(e)}")  # Add server-side logging
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/games/{game_id}", response_model=schemas.BoardGameOut)
 def game_detail(game_id: int, db: Session = Depends(get_db)):
