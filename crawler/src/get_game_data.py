@@ -128,7 +128,7 @@ def extract_basic_game_info(game_xml: bs4.element.Tag):
     if game_xml.find("image") is not None:
         game_dict["thumbnail"] = game_xml.find("thumbnail").text
         game_dict["image"] = game_xml.find("image").text
-    game_dict["description"] = html.unescape(game_xml.find("description").text)
+    game_dict["description"] = game_xml.find("description").text
     values_int = [
         "minplayers",
         "maxplayers",
@@ -293,6 +293,88 @@ def extract_version_info(game_dict: dict, game_xml: bs4.element.Tag):
     return game_dict
 
 
+def get_simple_game_data(
+    boardgame_ranks: pd.DataFrame,
+    boardgame_data: pd.DataFrame = None,
+    batch_saves: bool = False,
+    batch_size: int = 20,
+    log_level: str = "INFO",
+):
+    """
+    Fetch basic game information for each board game from BGG API using a simplified approach.
+    This version uses a simpler API call and skips complex data extraction.
+
+    Args:
+        boardgame_ranks (pd.DataFrame): DataFrame from get_boardgame_ranks()
+        boardgame_data (pd.DataFrame, optional): Existing game data to update
+        batch_saves (bool): Whether to save data after each batch
+        batch_size (int): Number of games to process in each batch
+        log_level (str): Logging level for this function
+
+    Returns:
+        pd.DataFrame: DataFrame containing basic game information
+    """
+    # Set logging level for this function
+    current_level = logger.level
+    logger.setLevel(getattr(logging, log_level.upper()))
+
+    logger.info(f"Starting to fetch simple data for {len(boardgame_ranks)} boardgames")
+    query_time = int(time())
+    data_dir = Path(__file__).parent.parent.parent / "data" / "crawler"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    save_path = data_dir / f"boardgame_simple_data_{query_time}.parquet"
+
+    boardgame_ids = boardgame_ranks["id"].tolist()
+    boardgame_master_dict = {}
+    if boardgame_data is not None:
+        logger.info("Using existing boardgame data as base")
+        boardgame_master_dict = {
+            str(x["id"]): x for x in boardgame_data.to_dict(orient="records")
+        }
+        boardgame_ids = list(
+            set(boardgame_ids).difference(
+                set(boardgame_data["id"].astype(int).tolist())
+            )
+        )
+    logger.info(f"Found {len(boardgame_ids)} new boardgames to process")
+
+    for batch_num in range(math.ceil(len(boardgame_ids) / batch_size)):
+        logger.info(
+            f"Processing batch {batch_num + 1} of {math.ceil(len(boardgame_ids) / batch_size)}"
+        )
+        batch_ids = boardgame_ids[batch_num * batch_size : (batch_num + 1) * batch_size]
+        batch_ids = [str(x) for x in batch_ids]
+        logger.debug(f"Processing boardgame IDs: {batch_ids}")
+        
+        bg_info_url = f"https://www.boardgamegeek.com/xmlapi2/thing?type=boardgame,boardgameexpansion&stats=1&ratingcomments=1&pagesize=10&page=1&id={','.join(batch_ids)}"
+        bgg_response = requests.get(bg_info_url)
+        soup_xml = BeautifulSoup(bgg_response.content, "xml")
+        games_xml_list = soup_xml.find_all(
+            "item", attrs={"type": ["boardgame", "boardgameexpansion"]}
+        )
+
+        for game_xml in games_xml_list:
+            game_dict = extract_basic_game_info(game_xml=game_xml)
+            boardgame_master_dict[game_dict["id"]] = game_dict
+            logger.debug(f"Completed processing game ID: {game_xml['id']}")
+
+        if batch_saves:
+            logger.info(f"Saving batch {batch_num + 1} data")
+            boardgame_data = pd.DataFrame(list(boardgame_master_dict.values()))
+            boardgame_data.to_parquet(save_path)
+            logger.info(f"Saved batch {batch_num + 1} data to {save_path}")
+        sleep(1)
+
+    boardgame_data = pd.DataFrame(list(boardgame_master_dict.values()))
+    logger.info("Successfully completed fetching all boardgame data")
+    boardgame_data.to_parquet(save_path)
+    logger.info(f"Saved final data to {save_path}")
+
+    # Restore original logging level
+    logger.setLevel(current_level)
+    return boardgame_data
+
+
 def main():
     """Main function to get board game data."""
     try:
@@ -302,6 +384,11 @@ def main():
             "--continue-from-last",
             action="store_true",
             help="Continue from the most recent output file",
+        )
+        parser.add_argument(
+            "--simple",
+            action="store_true",
+            help="Use simplified data collection (skips complex data extraction)",
         )
         args = parser.parse_args()
 
@@ -327,9 +414,14 @@ def main():
                 existing_data = pd.read_parquet(latest_games)
 
         # Get game data
-        df_games = get_boardgame_data(
-            df_ranks, boardgame_data=existing_data, batch_saves=True
-        )
+        if args.simple:
+            df_games = get_simple_game_data(
+                df_ranks, boardgame_data=existing_data, batch_saves=True
+            )
+        else:
+            df_games = get_boardgame_data(
+                df_ranks, boardgame_data=existing_data, batch_saves=True
+            )
         logger.info("Successfully completed getting board game data")
         return df_games
 
