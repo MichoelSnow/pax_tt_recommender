@@ -38,6 +38,7 @@ def get_boardgame_data(
     boardgame_data: pd.DataFrame = None,
     batch_saves: bool = False,
     batch_size: int = 20,
+    save_every_n_batches: int = 1,
     log_level: str = "INFO",
 ):
     """
@@ -49,6 +50,7 @@ def get_boardgame_data(
         boardgame_data (pd.DataFrame, optional): Existing game data to update
         batch_saves (bool): Whether to save data after each batch
         batch_size (int): Number of games to process in each batch. BGG API has a limit of 20 IDs per request.
+        save_every_n_batches (int): Save data after every N batches (default: 1)
         log_level (str): Logging level for this function
 
     Returns:
@@ -102,7 +104,7 @@ def get_boardgame_data(
             boardgame_master_dict[game_dict["id"]] = game_dict
             logger.debug(f"Completed processing game ID: {game_xml['id']}")
 
-        if batch_saves:
+        if batch_saves and (batch_num + 1) % save_every_n_batches == 0:
             logger.info(f"Saving batch {batch_num + 1} data")
             boardgame_data = pd.DataFrame(list(boardgame_master_dict.values()))
             boardgame_data.to_parquet(save_path)
@@ -298,6 +300,7 @@ def get_simple_game_data(
     boardgame_data: pd.DataFrame = None,
     batch_saves: bool = False,
     batch_size: int = 20,
+    save_every_n_batches: int = 1,
     log_level: str = "INFO",
 ):
     """
@@ -309,6 +312,7 @@ def get_simple_game_data(
         boardgame_data (pd.DataFrame, optional): Existing game data to update
         batch_saves (bool): Whether to save data after each batch
         batch_size (int): Number of games to process in each batch
+        save_every_n_batches (int): Save data after every N batches (default: 1)
         log_level (str): Logging level for this function
 
     Returns:
@@ -358,7 +362,7 @@ def get_simple_game_data(
             boardgame_master_dict[game_dict["id"]] = game_dict
             logger.debug(f"Completed processing game ID: {game_xml['id']}")
 
-        if batch_saves:
+        if batch_saves and (batch_num + 1) % save_every_n_batches == 0:
             logger.info(f"Saving batch {batch_num + 1} data")
             boardgame_data = pd.DataFrame(list(boardgame_master_dict.values()))
             boardgame_data.to_parquet(save_path)
@@ -390,6 +394,12 @@ def main():
             action="store_true",
             help="Use simplified data collection (skips complex data extraction)",
         )
+        parser.add_argument(
+            "--save-every-n-batches",
+            type=int,
+            default=1,
+            help="Save data after every N batches (default: 1)",
+        )
         args = parser.parse_args()
 
         # Get the most recent rankings file
@@ -407,7 +417,9 @@ def main():
         # Get existing game data if continuing
         existing_data = None
         if args.continue_from_last:
-            game_files = list(data_dir.glob("boardgame_data_*.parquet"))
+            # Choose the correct file pattern based on whether we're using simple mode
+            file_pattern = "boardgame_simple_data_*.parquet" if args.simple else "boardgame_data_*.parquet"
+            game_files = list(data_dir.glob(file_pattern))
             if game_files:
                 latest_games = max(game_files, key=lambda x: x.stat().st_mtime)
                 logger.info(f"Continuing from game data file: {latest_games}")
@@ -416,11 +428,17 @@ def main():
         # Get game data
         if args.simple:
             df_games = get_simple_game_data(
-                df_ranks, boardgame_data=existing_data, batch_saves=True
+                df_ranks, 
+                boardgame_data=existing_data, 
+                batch_saves=True,
+                save_every_n_batches=args.save_every_n_batches
             )
         else:
             df_games = get_boardgame_data(
-                df_ranks, boardgame_data=existing_data, batch_saves=True
+                df_ranks, 
+                boardgame_data=existing_data, 
+                batch_saves=True,
+                save_every_n_batches=args.save_every_n_batches
             )
         logger.info("Successfully completed getting board game data")
         return df_games
