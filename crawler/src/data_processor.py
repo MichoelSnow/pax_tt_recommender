@@ -75,6 +75,7 @@ def save_basic_info(
         "name",
         "thumbnail",
         "image",
+        "description",
     ]
 
     # Games with rank 0 should be nan
