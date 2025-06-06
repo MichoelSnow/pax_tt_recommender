@@ -39,33 +39,33 @@ def create_game_record(game_data: pd.Series) -> models.BoardGame:
         rank=None if pd.isna(game_data["rank"]) else int(game_data["rank"]),
         thumbnail=None if pd.isna(game_data["thumbnail"]) else game_data["thumbnail"],
         image=None if pd.isna(game_data["image"]) else game_data["image"],
-        minplayers=game_data["minplayers"],
-        maxplayers=game_data["maxplayers"],
-        playingtime=game_data["playingtime"],
-        minplaytime=game_data["minplaytime"],
-        maxplaytime=game_data["maxplaytime"],
-        minage=game_data["minage"],
+        min_players=game_data["minplayers"],
+        max_players=game_data["maxplayers"],
+        playing_time=game_data["playingtime"],
+        min_playtime=game_data["minplaytime"],
+        max_playtime=game_data["maxplaytime"],
+        min_age=game_data["minage"],
         year_published=game_data["yearpublished"],
         average=game_data["average"],
-        numratings=game_data["numratings"],
-        numcomments=game_data["numcomments"],
-        numweights=game_data["numweights"],
-        averageweight=game_data["averageweight"],
+        num_ratings=game_data["numratings"],
+        num_comments=game_data["numcomments"],
+        num_weights=game_data["numweights"],
+        average_weight=game_data["averageweight"],
         stddev=game_data["stddev"],
         median=game_data["median"],
         owned=game_data["owned"],
         trading=game_data["trading"],
         wanting=game_data["wanting"],
         wishing=game_data["wishing"],
-        bayesaverage=game_data["bayesaverage"],
-        usersrated=game_data["usersrated"],
+        bayes_average=game_data["bayesaverage"],
+        users_rated=game_data["usersrated"],
         is_expansion=game_data["is_expansion"],
         abstracts_rank=None if pd.isna(game_data["abstracts_rank"]) else int(game_data["abstracts_rank"]),
         cgs_rank=None if pd.isna(game_data["cgs_rank"]) else int(game_data["cgs_rank"]),
-        childrensgames_rank=None if pd.isna(game_data["childrensgames_rank"]) else int(game_data["childrensgames_rank"]),
-        familygames_rank=None if pd.isna(game_data["familygames_rank"]) else int(game_data["familygames_rank"]),
-        partygames_rank=None if pd.isna(game_data["partygames_rank"]) else int(game_data["partygames_rank"]),
-        strategygames_rank=None if pd.isna(game_data["strategygames_rank"]) else int(game_data["strategygames_rank"]),
+        childrens_games_rank=None if pd.isna(game_data["childrensgames_rank"]) else int(game_data["childrensgames_rank"]),
+        family_games_rank=None if pd.isna(game_data["familygames_rank"]) else int(game_data["familygames_rank"]),
+        party_games_rank=None if pd.isna(game_data["partygames_rank"]) else int(game_data["partygames_rank"]),
+        strategy_games_rank=None if pd.isna(game_data["strategygames_rank"]) else int(game_data["strategygames_rank"]),
         thematic_rank=None if pd.isna(game_data["thematic_rank"]) else int(game_data["thematic_rank"]),
         wargames_rank=None if pd.isna(game_data["wargames_rank"]) else int(game_data["wargames_rank"])
     )
@@ -194,6 +194,7 @@ def create_related_objects(game_id: int, game_data: pd.Series, related_data: Dic
                 recommended=row['recommended'],
                 not_recommended=row['not_recommended'],
                 game_total_votes=row['game_total_votes'],
+                player_count_total_votes=row['total_votes'],
                 recommendation=row['recommendation']
             ) for _, row in game_players.iterrows()]
             related_objects.extend(suggested_players)
@@ -203,10 +204,22 @@ def create_related_objects(game_id: int, game_data: pd.Series, related_data: Dic
         lang_df = related_data['language_dependence']
         game_lang = lang_df[lang_df['id'] == game_id]
         if not game_lang.empty:
+            row = game_lang.iloc[0]
+            # Convert values to integers, handling any hex strings
+            def convert_value(val):
+                if isinstance(val, str) and val.startswith('0x'):
+                    return int(val, 16)
+                return int(float(val)) if pd.notna(val) else 0
+
             lang_dep = models.LanguageDependence(
                 game_id=game_id,
-                language_dependency=game_lang.iloc[0]['language_dependency'],
-                total_votes=game_lang.iloc[0]['total_votes']
+                level_1=convert_value(row['1']),
+                level_2=convert_value(row['2']),
+                level_3=convert_value(row['3']),
+                level_4=convert_value(row['4']),
+                level_5=convert_value(row['5']),
+                total_votes=convert_value(row['total_votes']),
+                language_dependency=convert_value(row['language_dependency'])
             )
             related_objects.append(lang_dep)
     
