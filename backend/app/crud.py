@@ -12,6 +12,8 @@ def get_games(
     skip: int = 0,
     limit: int = 100,
     designer: Optional[str] = None,
+    designer_id: Optional[int] = None,
+    artist_id: Optional[int] = None,
     mechanic: Optional[str] = None,
     mechanics: Optional[str] = None,
     category: Optional[str] = None,
@@ -31,6 +33,12 @@ def get_games(
 
         if designer:
             query = query.join(models.BoardGame.designers).filter(models.Designer.name == designer)
+        
+        if designer_id:
+            query = query.join(models.BoardGame.designers).filter(models.Designer.boardgamedesigner_id == designer_id)
+        
+        if artist_id:
+            query = query.join(models.BoardGame.artists).filter(models.Artist.boardgameartist_id == artist_id)
 
         if mechanic:
             query = query.join(models.BoardGame.mechanics).filter(models.Mechanic.name == mechanic)

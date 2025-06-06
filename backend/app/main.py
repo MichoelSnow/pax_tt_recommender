@@ -51,6 +51,8 @@ def list_games(
     skip: int = 0,
     limit: int = 100,
     designer: Optional[str] = None,
+    designer_id: Optional[int] = None,
+    artist_id: Optional[int] = None,
     mechanic: Optional[str] = None,
     mechanics: Optional[str] = None,
     category: Optional[str] = None,
@@ -63,7 +65,7 @@ def list_games(
     db: Session = Depends(get_db)
 ):
     try:
-        return crud.get_games(db, skip, limit, designer, mechanic, mechanics, category, publisher, search, players, recommendations, weight, sort_by)
+        return crud.get_games(db, skip, limit, designer, designer_id, artist_id, mechanic, mechanics, category, publisher, search, players, recommendations, weight, sort_by)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

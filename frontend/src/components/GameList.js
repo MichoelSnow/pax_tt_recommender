@@ -46,6 +46,8 @@ const GameList = () => {
   const [selectedGame, setSelectedGame] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [sortBy, setSortBy] = useState('rank');
+  const [designerId, setDesignerId] = useState(null);
+  const [artistId, setArtistId] = useState(null);
   const gamesPerPage = 10;
 
   const sortOptions = [
@@ -80,18 +82,29 @@ const GameList = () => {
     fetchMechanics();
   }, []);
 
-  const searchGames = async (term, players, recs, mechs, weightFilter, sort) => {
+  const searchGames = async (term, players, recs, mechs, weightFilter, sort, designer, artist) => {
     try {
       setLoading(true);
       const params = {
-        search: term || undefined,
         limit: gamesPerPage,
         skip: 0,
         sort_by: sort
       };
 
+      if (term) {
+        params.search = term;
+      }
+
       if (players) {
         params.players = players;
+      }
+
+      if (designer) {
+        params.designer_id = designer;
+      }
+
+      if (artist) {
+        params.artist_id = artist;
       }
 
       const activeRecommendations = Object.entries(recs)
@@ -114,6 +127,7 @@ const GameList = () => {
         params.mechanics = mechs.map(m => m.name).join(',');
       }
 
+      console.log('Search params:', params);  // Debug log
       const response = await axios.get('http://localhost:8000/games', { params });
       setGames(response.data);
       setFilteredGames(response.data);
@@ -123,16 +137,12 @@ const GameList = () => {
     } catch (err) {
       console.error('Search error:', err);
       if (err.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
         console.error('Error response:', err.response.data);
         setError(`Error: ${err.response.data.detail || 'Failed to search games. Please try again later.'}`);
       } else if (err.request) {
-        // The request was made but no response was received
         console.error('No response received:', err.request);
         setError('No response from server. Please check if the backend is running.');
       } else {
-        // Something happened in setting up the request that triggered an Error
         console.error('Error setting up request:', err.message);
         setError('Failed to search games. Please try again later.');
       }
@@ -142,8 +152,8 @@ const GameList = () => {
 
   // Create a debounced version of the search function
   const debouncedSearch = useCallback(
-    debounce((term, players, recs, mechs, weightFilter, sort) => {
-      searchGames(term, players, recs, mechs, weightFilter, sort);
+    debounce((term, players, recs, mechs, weightFilter, sort, designer, artist) => {
+      searchGames(term, players, recs, mechs, weightFilter, sort, designer, artist);
     }, 500),
     []
   );
@@ -198,12 +208,12 @@ const GameList = () => {
 
   // Update search when any filter changes
   useEffect(() => {
-    debouncedSearch(searchTerm, playerCount, recommendations, selectedMechanics, weight, sortBy);
+    debouncedSearch(searchTerm, playerCount, recommendations, selectedMechanics, weight, sortBy, designerId, artistId);
     // Cleanup function to cancel any pending debounced calls
     return () => {
       debouncedSearch.cancel();
     };
-  }, [searchTerm, playerCount, recommendations, selectedMechanics, weight, sortBy, debouncedSearch]);
+  }, [searchTerm, playerCount, recommendations, selectedMechanics, weight, sortBy, designerId, artistId, debouncedSearch]);
 
   const loadMore = async () => {
     try {
@@ -265,6 +275,18 @@ const GameList = () => {
       setDetailsOpen(true);
     } catch (err) {
       setError('Failed to fetch game details. Please try again later.');
+    }
+  };
+
+  const handleFilter = (type, id) => {
+    if (type === 'designer') {
+      setDesignerId(id);
+      setArtistId(null);
+      setSearchTerm('');
+    } else if (type === 'artist') {
+      setArtistId(id);
+      setDesignerId(null);
+      setSearchTerm('');
     }
   };
 
@@ -484,6 +506,7 @@ const GameList = () => {
         game={selectedGame}
         open={detailsOpen}
         onClose={() => setDetailsOpen(false)}
+        onFilter={handleFilter}
       />
     </Container>
   );

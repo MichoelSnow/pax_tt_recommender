@@ -13,10 +13,10 @@ import {
   Paper,
 } from '@mui/material';
 
-const GameDetails = ({ game, open, onClose }) => {
+const GameDetails = ({ game, open, onClose, onFilter }) => {
   if (!game) return null;
 
-  const renderList = (items, label) => {
+  const renderList = (items, label, type) => {
     if (!items || items.length === 0) return null;
     return (
       <Box sx={{ mb: 2 }}>
@@ -24,13 +24,33 @@ const GameDetails = ({ game, open, onClose }) => {
           {label}
         </Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {items.map((item) => (
-            <Chip
-              key={item.boardgamemechanic_id || item.boardgamecategory_id || item.boardgamedesigner_id || item.boardgameartist_id || item.boardgamepublisher_id}
-              label={item.boardgamemechanic_name || item.boardgamecategory_name || item.boardgamedesigner_name || item.boardgameartist_name || item.boardgamepublisher_name}
-              size="small"
-            />
-          ))}
+          {items.map((item) => {
+            const name = item.boardgamemechanic_name || item.boardgamecategory_name || 
+                        item.boardgamedesigner_name || item.boardgameartist_name || 
+                        item.boardgamepublisher_name;
+            const id = item.boardgamemechanic_id || item.boardgamecategory_id || 
+                      item.boardgamedesigner_id || item.boardgameartist_id || 
+                      item.boardgamepublisher_id;
+            const isClickable = type === 'designer' || type === 'artist';
+            
+            return (
+              <Chip
+                key={id}
+                label={name}
+                size="small"
+                onClick={isClickable ? () => {
+                  onFilter(type, id);
+                  onClose();
+                } : undefined}
+                sx={isClickable ? {
+                  cursor: 'pointer',
+                  '&:hover': {
+                    backgroundColor: 'action.hover'
+                  }
+                } : undefined}
+              />
+            );
+          })}
         </Box>
       </Box>
     );
@@ -97,11 +117,11 @@ const GameDetails = ({ game, open, onClose }) => {
               </Typography>
             </Box>
             <Divider sx={{ my: 2 }} />
-            {renderList(game.designers, 'Designers')}
-            {renderList(game.artists, 'Artists')}
-            {renderList(game.mechanics, 'Mechanics')}
-            {renderList(game.categories, 'Categories')}
-            {renderList(game.publishers, 'Publishers')}
+            {renderList(game.designers, 'Designers', 'designer')}
+            {renderList(game.artists, 'Artists', 'artist')}
+            {renderList(game.mechanics, 'Mechanics', 'mechanic')}
+            {renderList(game.categories, 'Categories', 'category')}
+            {renderList(game.publishers, 'Publishers', 'publisher')}
           </Grid>
           <Grid item xs={12} md={6}>
             <Typography variant="subtitle1" gutterBottom>
