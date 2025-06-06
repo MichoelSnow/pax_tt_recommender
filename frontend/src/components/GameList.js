@@ -18,10 +18,34 @@ import {
   Checkbox,
   Divider,
   Autocomplete,
+  CardMedia,
+  Pagination,
+  CircularProgress,
+  InputAdornment,
+  IconButton,
+  Chip,
+  Stack,
+  Tooltip,
 } from '@mui/material';
 import axios from 'axios';
 import debounce from 'lodash/debounce';
+import SearchIcon from '@mui/icons-material/Search';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import CloseIcon from '@mui/icons-material/Close';
 import GameDetails from './GameDetails';
+
+// Helper function to decode HTML entities and preserve line breaks
+const decodeHtmlEntities = (text) => {
+  if (!text) return '';
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  // Convert HTML line breaks to newlines and preserve them
+  return textarea.value
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/&#10;/g, '\n')
+    .replace(/&#13;/g, '\n')
+    .replace(/&nbsp;/g, ' ');
+};
 
 const GameList = () => {
   const [games, setGames] = useState([]);
@@ -307,7 +331,7 @@ const GameList = () => {
   }
 
   return (
-    <Container>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
       <Box sx={{ my: 4, display: 'flex', gap: 4 }}>
         <Box sx={{ flex: 1 }}>
           <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
@@ -334,45 +358,57 @@ const GameList = () => {
             </FormControl>
           </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {displayedGames.map((game) => (
+            {games.map((game) => (
               <Card 
                 key={game.id}
-                onClick={() => handleGameClick(game)}
                 sx={{ 
+                  display: 'flex',
                   cursor: 'pointer',
                   '&:hover': {
-                    backgroundColor: 'action.hover'
+                    boxShadow: 6
                   }
                 }}
+                onClick={() => handleGameClick(game)}
               >
-                <Box sx={{ display: 'flex', p: 2 }}>
-                  {game.image && (
-                    <Box
-                      component="img"
-                      src={game.image}
-                      alt={game.name}
-                      sx={{
-                        width: 100,
-                        height: 100,
-                        objectFit: 'contain',
-                        display: 'block',
-                        marginRight: 2,
-                        backgroundColor: '#f5f5f5'
-                      }}
-                    />
-                  )}
+                <CardMedia
+                  component="img"
+                  sx={{ 
+                    width: 150,
+                    objectFit: 'contain',
+                    backgroundColor: '#f5f5f5'
+                  }}
+                  image={game.image || '/placeholder.png'}
+                  alt={game.name}
+                />
+                <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="h6" gutterBottom>
                       {game.name}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                       {getRankLabel(sortBy)}: {game[sortBy] || 'Unranked'}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                       Published: {game.year_published || 'Unknown'}
                     </Typography>
+                    {game.description && (
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary"
+                        sx={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'pre-line'
+                        }}
+                      >
+                        {decodeHtmlEntities(game.description)}
+                      </Typography>
+                    )}
                   </Box>
-                </Box>
+                </CardContent>
               </Card>
             ))}
           </Box>

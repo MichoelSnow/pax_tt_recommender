@@ -7,6 +7,7 @@ class BoardGame(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String)
+    description = Column(String)
     thumbnail = Column(String)
     image = Column(String)
     min_players = Column(Integer)
