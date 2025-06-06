@@ -195,3 +195,21 @@ class FilterOptions(BaseModel):
     mechanics: List[str]
     categories: List[str]
     publishers: List[str]
+
+    class Config:
+        from_attributes = True
+
+
+class MechanicFrequency(BaseModel):
+    name: str
+    count: int
+
+    class Config:
+        from_attributes = True
+
+
+class Mechanic(MechanicBase):
+    game_id: int
+
+    class Config:
+        from_attributes = True

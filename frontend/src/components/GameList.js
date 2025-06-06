@@ -13,6 +13,11 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  FormGroup,
+  FormControlLabel,
+  Checkbox,
+  Divider,
+  Autocomplete,
 } from '@mui/material';
 import axios from 'axios';
 import debounce from 'lodash/debounce';
@@ -23,6 +28,12 @@ const GameList = () => {
   const [displayedGames, setDisplayedGames] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [playerCount, setPlayerCount] = useState('');
+  const [recommendations, setRecommendations] = useState({
+    best: false,
+    recommended: false
+  });
+  const [mechanics, setMechanics] = useState([]);
+  const [selectedMechanics, setSelectedMechanics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
@@ -31,17 +42,44 @@ const GameList = () => {
   // Generate player count options (1-12)
   const playerCountOptions = Array.from({ length: 12 }, (_, i) => i + 1);
 
-  const searchGames = async (term, players) => {
+  useEffect(() => {
+    const fetchMechanics = async () => {
+      try {
+        const response = await axios.get('http://localhost:8000/mechanics');
+        setMechanics(response.data);
+      } catch (err) {
+        console.error('Failed to fetch mechanics:', err);
+      }
+    };
+    fetchMechanics();
+  }, []);
+
+  const searchGames = async (term, players, recs, mechs) => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:8000/games/', {
-        params: {
-          search: term,
-          players: players,
-          limit: gamesPerPage,
-          skip: 0
-        }
-      });
+      const params = {
+        search: term || undefined,
+        limit: gamesPerPage,
+        skip: 0
+      };
+
+      if (players) {
+        params.players = players;
+      }
+
+      const activeRecommendations = Object.entries(recs)
+        .filter(([_, checked]) => checked)
+        .map(([key]) => key);
+      
+      if (activeRecommendations.length > 0) {
+        params.recommendations = activeRecommendations.join(',');
+      }
+
+      if (mechs.length > 0) {
+        params.mechanics = mechs.map(m => m.name).join(',');
+      }
+
+      const response = await axios.get('http://localhost:8000/games/', { params });
       setGames(response.data);
       setFilteredGames(response.data);
       setDisplayedGames(response.data);
@@ -55,8 +93,8 @@ const GameList = () => {
 
   // Create a debounced version of the search function
   const debouncedSearch = useCallback(
-    debounce((term, players) => {
-      searchGames(term, players);
+    debounce((term, players, recs, mechs) => {
+      searchGames(term, players, recs, mechs);
     }, 500),
     []
   );
@@ -64,13 +102,28 @@ const GameList = () => {
   useEffect(() => {
     const fetchGames = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/games/', {
-          params: {
-            skip: 0,
-            limit: gamesPerPage,
-            players: playerCount
-          }
-        });
+        const params = {
+          skip: 0,
+          limit: gamesPerPage
+        };
+
+        if (playerCount) {
+          params.players = playerCount;
+        }
+
+        const activeRecommendations = Object.entries(recommendations)
+          .filter(([_, checked]) => checked)
+          .map(([key]) => key);
+        
+        if (activeRecommendations.length > 0) {
+          params.recommendations = activeRecommendations.join(',');
+        }
+
+        if (selectedMechanics.length > 0) {
+          params.mechanics = selectedMechanics.map(m => m.name).join(',');
+        }
+
+        const response = await axios.get('http://localhost:8000/games/', { params });
         setGames(response.data);
         setFilteredGames(response.data);
         setDisplayedGames(response.data);
@@ -84,26 +137,41 @@ const GameList = () => {
     fetchGames();
   }, []);
 
-  // Update search when either search term or player count changes
+  // Update search when any filter changes
   useEffect(() => {
-    debouncedSearch(searchTerm, playerCount);
+    debouncedSearch(searchTerm, playerCount, recommendations, selectedMechanics);
     // Cleanup function to cancel any pending debounced calls
     return () => {
       debouncedSearch.cancel();
     };
-  }, [searchTerm, playerCount, debouncedSearch]);
+  }, [searchTerm, playerCount, recommendations, selectedMechanics, debouncedSearch]);
 
   const loadMore = async () => {
     try {
       const nextPage = page + 1;
-      const response = await axios.get('http://localhost:8000/games/', {
-        params: {
-          skip: (nextPage - 1) * gamesPerPage,
-          limit: gamesPerPage,
-          search: searchTerm,
-          players: playerCount
-        }
-      });
+      const params = {
+        skip: (nextPage - 1) * gamesPerPage,
+        limit: gamesPerPage,
+        search: searchTerm || undefined
+      };
+
+      if (playerCount) {
+        params.players = playerCount;
+      }
+
+      const activeRecommendations = Object.entries(recommendations)
+        .filter(([_, checked]) => checked)
+        .map(([key]) => key);
+      
+      if (activeRecommendations.length > 0) {
+        params.recommendations = activeRecommendations.join(',');
+      }
+
+      if (selectedMechanics.length > 0) {
+        params.mechanics = selectedMechanics.map(m => m.name).join(',');
+      }
+
+      const response = await axios.get('http://localhost:8000/games/', { params });
       
       if (response.data.length > 0) {
         const newGames = [...games, ...response.data];
@@ -115,6 +183,13 @@ const GameList = () => {
     } catch (err) {
       setError('Failed to load more games. Please try again later.');
     }
+  };
+
+  const handleRecommendationChange = (event) => {
+    setRecommendations({
+      ...recommendations,
+      [event.target.name]: event.target.checked
+    });
   };
 
   if (loading) {
@@ -190,8 +265,8 @@ const GameList = () => {
             </Box>
           )}
         </Box>
-        <Box sx={{ width: 200 }}>
-          <FormControl fullWidth>
+        <Box sx={{ width: 300 }}>
+          <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel>Number of Players</InputLabel>
             <Select
               value={playerCount}
@@ -205,6 +280,66 @@ const GameList = () => {
                 </MenuItem>
               ))}
             </Select>
+          </FormControl>
+          <FormControl component="fieldset" sx={{ mb: 2 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              BGG Player Count Recs
+            </Typography>
+            <FormGroup>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={recommendations.best}
+                    onChange={handleRecommendationChange}
+                    name="best"
+                  />
+                }
+                label="Best"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={recommendations.recommended}
+                    onChange={handleRecommendationChange}
+                    name="recommended"
+                  />
+                }
+                label="Recommended"
+              />
+            </FormGroup>
+          </FormControl>
+          <Divider sx={{ my: 2 }} />
+          <FormControl fullWidth>
+            <Typography variant="subtitle1" gutterBottom>
+              Mechanics
+            </Typography>
+            <Autocomplete
+              multiple
+              options={mechanics}
+              getOptionLabel={(option) => `${option.name} (${option.count})`}
+              value={selectedMechanics}
+              onChange={(event, newValue) => {
+                setSelectedMechanics(newValue);
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  variant="outlined"
+                  placeholder="Select mechanics"
+                />
+              )}
+              renderOption={(props, option) => {
+                const { key, ...otherProps } = props;
+                return (
+                  <li key={option.name} {...otherProps}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                      <Typography>{option.name}</Typography>
+                      <Typography color="text.secondary">({option.count})</Typography>
+                    </Box>
+                  </li>
+                );
+              }}
+            />
           </FormControl>
         </Box>
       </Box>
