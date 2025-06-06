@@ -23,6 +23,7 @@ from pathlib import Path
 import json
 import argparse
 import bs4
+import html
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -127,6 +128,7 @@ def extract_basic_game_info(game_xml: bs4.element.Tag):
     if game_xml.find("image") is not None:
         game_dict["thumbnail"] = game_xml.find("thumbnail").text
         game_dict["image"] = game_xml.find("image").text
+    game_dict["description"] = html.unescape(game_xml.find("description").text)
     values_int = [
         "minplayers",
         "maxplayers",
