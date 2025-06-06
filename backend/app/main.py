@@ -14,10 +14,11 @@ app = FastAPI(title="Board Game Recommender API")
 # CORS config for frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 def get_db():
@@ -33,13 +34,15 @@ def list_games(
     limit: int = 100,
     designer: Optional[str] = None,
     mechanic: Optional[str] = None,
+    mechanics: Optional[str] = None,
     category: Optional[str] = None,
     publisher: Optional[str] = None,
     search: Optional[str] = None,
     players: Optional[int] = None,
+    recommendations: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    return crud.get_games(db, skip, limit, designer, mechanic, category, publisher, search, players)
+    return crud.get_games(db, skip, limit, designer, mechanic, mechanics, category, publisher, search, players, recommendations)
 
 @app.get("/games/{game_id}", response_model=schemas.BoardGameOut)
 def game_detail(game_id: int, db: Session = Depends(get_db)):
@@ -116,4 +119,12 @@ def add_expansion(game_id: int, expansion: schemas.ExpansionBase, db: Session = 
 @app.post("/games/{game_id}/families", response_model=schemas.FamilyBase)
 def add_family(game_id: int, family: schemas.FamilyBase, db: Session = Depends(get_db)):
     return crud.add_family(db, game_id, family)
+
+@app.get("/mechanics", response_model=List[schemas.MechanicFrequency])
+def get_mechanics(db: Session = Depends(get_db)):
+    try:
+        mechanics = crud.get_mechanics_by_frequency(db)
+        return [{"name": m.name, "count": m.count} for m in mechanics]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 

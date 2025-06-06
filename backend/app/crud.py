@@ -15,17 +15,30 @@ def get_games(
     category: Optional[str] = None,
     publisher: Optional[str] = None,
     search: Optional[str] = None,
-    players: Optional[int] = None
+    players: Optional[int] = None,
+    recommendations: Optional[str] = None
 ):
     query = db.query(models.BoardGame)
     
     if search:
         query = query.filter(models.BoardGame.name.ilike(f'%{search}%'))
+    
     if players:
-        query = query.filter(
-            models.BoardGame.min_players <= players,
-            models.BoardGame.max_players >= players
-        )
+        if recommendations:
+            # If recommendations are selected, use SuggestedPlayer table
+            rec_list = recommendations.split(',')
+            # Use OR logic for recommendations - game should match ANY of the selected recommendations
+            query = query.join(models.SuggestedPlayer).filter(
+                models.SuggestedPlayer.player_count == players,
+                models.SuggestedPlayer.recommendation.in_(rec_list)
+            ).distinct()  # Add distinct to avoid duplicates if a game matches multiple recommendations
+        else:
+            # If no recommendations selected, use min_players and max_players
+            query = query.filter(
+                models.BoardGame.min_players <= players,
+                models.BoardGame.max_players >= players
+            )
+    
     if designer:
         query = query.join(models.Designer).filter(models.Designer.name == designer)
     if mechanic:
@@ -92,3 +105,60 @@ def add_publisher(db: Session, game_id: int, publisher_name: str):
     db.add(publisher)
     db.commit()
     return publisher
+
+def get_mechanics_by_frequency(db: Session):
+    return db.query(
+        models.Mechanic.boardgamemechanic_name.label('name'),
+        func.count(models.Mechanic.boardgamemechanic_name).label('count')
+    ).group_by(models.Mechanic.boardgamemechanic_name).order_by(func.count(models.Mechanic.boardgamemechanic_name).desc()).all()
+
+def get_games(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    designer: Optional[str] = None,
+    mechanic: Optional[str] = None,
+    mechanics: Optional[str] = None,
+    category: Optional[str] = None,
+    publisher: Optional[str] = None,
+    search: Optional[str] = None,
+    players: Optional[int] = None,
+    recommendations: Optional[str] = None
+):
+    query = db.query(models.BoardGame)
+    
+    if search:
+        query = query.filter(models.BoardGame.name.ilike(f'%{search}%'))
+    
+    if players:
+        if recommendations:
+            rec_list = recommendations.split(',')
+            query = query.join(models.SuggestedPlayer).filter(
+                models.SuggestedPlayer.player_count == players,
+                models.SuggestedPlayer.recommendation.in_(rec_list)
+            ).distinct()
+        else:
+            query = query.filter(
+                models.BoardGame.min_players <= players,
+                models.BoardGame.max_players >= players
+            )
+    
+    if mechanics:
+        mechanic_list = mechanics.split(',')
+        query = query.join(models.Mechanic).filter(
+            models.Mechanic.boardgamemechanic_name.in_(mechanic_list)
+        ).distinct()
+    
+    if designer:
+        query = query.join(models.Designer).filter(models.Designer.name == designer)
+    if mechanic:
+        query = query.join(models.Mechanic).filter(models.Mechanic.name == mechanic)
+    if category:
+        query = query.join(models.Category).filter(models.Category.name == category)
+    if publisher:
+        query = query.join(models.Publisher).filter(models.Publisher.name == publisher)
+    
+    # Order by rank, with NULL ranks appearing last
+    query = query.order_by(models.BoardGame.rank.asc().nullslast())
+    
+    return query.offset(skip).limit(limit).all()
