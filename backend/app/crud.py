@@ -3,6 +3,9 @@ from sqlalchemy import func
 from sqlalchemy.sql import or_, and_
 from . import models, schemas
 from typing import List, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 # def get_games(db: Session, skip: int = 0, limit: int = 100):
 #     return db.query(models.BoardGame).offset(skip).limit(limit).all()
@@ -102,7 +105,7 @@ def get_games(
 
         return query.offset(skip).limit(limit).all()
     except Exception as e:
-        print(f"Error in get_games: {str(e)}")  # Add server-side logging
+        logger.error(f"Error in get_games: {str(e)}")
         raise
 
 def get_game(db: Session, game_id: int):

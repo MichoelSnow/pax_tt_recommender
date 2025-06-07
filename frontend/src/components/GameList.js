@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, memo } from 'react';
 import {
   Container,
   Grid,
@@ -24,9 +24,11 @@ import {
   Chip,
   Skeleton,
   Pagination,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import debounce from 'lodash/debounce';
 import SearchIcon from '@mui/icons-material/Search';
@@ -68,8 +70,47 @@ const getRankLabel = (sortValue) => {
 // Generate player count options (1-12)
 const playerCountOptions = Array.from({ length: 12 }, (_, i) => i + 1);
 
-// Loading skeleton for game cards
-const GameCardSkeleton = () => (
+// Memoized GameCard component
+const GameCard = memo(({ game, onClick, sortBy }) => (
+  <Card 
+    sx={{ 
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      cursor: 'pointer',
+      '&:hover': {
+        boxShadow: 6
+      }
+    }}
+    onClick={onClick}
+  >
+    <CardMedia
+      component="img"
+      sx={{ 
+        height: 140,
+        objectFit: 'contain',
+        backgroundColor: '#f5f5f5'
+      }}
+      image={game.image || '/placeholder.png'}
+      alt={game.name}
+      loading="lazy"
+    />
+    <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
+      <Typography variant="h6" sx={{ fontSize: '1rem', mb: 0.5 }}>
+        {game.name}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+        {getRankLabel(sortBy)}: {game[sortBy] || 'Unranked'}
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Published: {game.year_published || 'Unknown'}
+      </Typography>
+    </CardContent>
+  </Card>
+));
+
+// Memoized GameCardSkeleton component
+const GameCardSkeleton = memo(() => (
   <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
     <Skeleton variant="rectangular" height={140} />
     <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
@@ -78,11 +119,12 @@ const GameCardSkeleton = () => (
       <Skeleton variant="text" width="40%" height={20} />
     </CardContent>
   </Card>
-);
+));
 
 const GameList = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [playerCount, setPlayerCount] = useState('');
   const [recommendations, setRecommendations] = useState({
@@ -100,10 +142,16 @@ const GameList = () => {
   const [sortBy, setSortBy] = useState('rank');
   const [designerId, setDesignerId] = useState(null);
   const [artistId, setArtistId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const gamesPerPage = 24;
 
-  // Get current page from URL or default to 1
-  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  // Remove page parameter from URL on mount
+  useEffect(() => {
+    if (searchParams.has('page')) {
+      searchParams.delete('page');
+      setSearchParams(searchParams);
+    }
+  }, []);
 
   // Fetch mechanics
   const { data: mechanics = [] } = useQuery({
@@ -156,21 +204,14 @@ const GameList = () => {
     keepPreviousData: true,
   });
 
-  // Update URL when page changes
-  const handlePageChange = (event, newPage) => {
-    setSearchParams(prev => {
-      prev.set('page', newPage.toString());
-      return prev;
-    });
-  };
-
   // Reset page when filters change
   useEffect(() => {
-    setSearchParams(prev => {
-      prev.set('page', '1');
-      return prev;
-    });
+    setCurrentPage(1);
   }, [searchTerm, playerCount, recommendations, selectedMechanics, weight, sortBy, designerId, artistId]);
+
+  const handlePageChange = (event, newPage) => {
+    setCurrentPage(newPage);
+  };
 
   const handleGameClick = async (game) => {
     try {
@@ -218,51 +259,22 @@ const GameList = () => {
         <Grid container spacing={2}>
           {games.map((game) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={game.id}>
-              <Card 
-                sx={{ 
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    boxShadow: 6
-                  }
-                }}
+              <GameCard
+                game={game}
                 onClick={() => handleGameClick(game)}
-              >
-                <CardMedia
-                  component="img"
-                  sx={{ 
-                    height: 140,
-                    objectFit: 'contain',
-                    backgroundColor: '#f5f5f5'
-                  }}
-                  image={game.image || '/placeholder.png'}
-                  alt={game.name}
-                />
-                <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
-                  <Typography variant="h6" sx={{ fontSize: '1rem', mb: 0.5 }}>
-                    {game.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                    {getRankLabel(sortBy)}: {game[sortBy] || 'Unranked'}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Published: {game.year_published || 'Unknown'}
-                  </Typography>
-                </CardContent>
-              </Card>
+                sortBy={sortBy}
+              />
             </Grid>
           ))}
         </Grid>
         {games.length >= gamesPerPage && (
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
             <Pagination
-              count={10} // Assuming max 10 pages for now
+              count={10}
               page={currentPage}
               onChange={handlePageChange}
               color="primary"
-              size="large"
+              size={isMobile ? "small" : "large"}
               disabled={isFetching}
             />
           </Box>
@@ -425,4 +437,4 @@ const GameList = () => {
   );
 };
 
-export default GameList; 
+export default memo(GameList); 
