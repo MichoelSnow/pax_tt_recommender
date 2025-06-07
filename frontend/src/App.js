@@ -1,9 +1,23 @@
 import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { Container, Typography, Box } from '@mui/material';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import GameList from './components/GameList';
+import Navbar from './components/Navbar';
 import './App.css';
+
+// Create a client with optimized caching
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 60 * 1000, // 30 minutes
+      cacheTime: 24 * 60 * 60 * 1000, // 24 hours
+      refetchOnWindowFocus: false, // Don't refetch when window regains focus
+      retry: 1, // Only retry failed requests once
+    },
+  },
+});
 
 const theme = createTheme({
   palette: {
@@ -19,22 +33,17 @@ const theme = createTheme({
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <div className="App">
-        <Box sx={{ bgcolor: 'primary.main', color: 'white', py: 3, mb: 4 }}>
-          <Container>
-            <Typography variant="h3" component="h1" gutterBottom>
-              Board Game Recommender
-            </Typography>
-            <Typography variant="subtitle1">
-              Discover and explore board games
-            </Typography>
-          </Container>
-        </Box>
-        <GameList />
-      </div>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Router>
+          <Navbar />
+          <Routes>
+            <Route path="/" element={<GameList />} />
+          </Routes>
+        </Router>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 
