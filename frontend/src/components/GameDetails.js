@@ -44,7 +44,8 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
             const id = item.boardgamemechanic_id || item.boardgamecategory_id || 
                       item.boardgamedesigner_id || item.boardgameartist_id || 
                       item.boardgamepublisher_id;
-            const isClickable = type === 'designer' || type === 'artist';
+            const isClickable = type === 'designer' || type === 'artist' || 
+                              type === 'mechanic' || type === 'category';
             
             return (
               <Chip
