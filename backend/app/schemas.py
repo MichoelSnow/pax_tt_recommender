@@ -189,3 +189,10 @@ class BoardGameList(BoardGameBase):
     suggested_players: Optional[List[SuggestedPlayerBase]] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class GameListResponse(BaseModel):
+    games: List[BoardGameList]
+    total: int
+
+    model_config = ConfigDict(from_attributes=True)
