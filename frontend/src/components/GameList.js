@@ -26,6 +26,7 @@ import {
   Pagination,
   useMediaQuery,
   useTheme,
+  InputAdornment,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
@@ -34,6 +35,11 @@ import debounce from 'lodash/debounce';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import CloseIcon from '@mui/icons-material/Close';
+import PeopleIcon from '@mui/icons-material/People';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import PsychologyAltOutlinedIcon from '@mui/icons-material/PsychologyAltOutlined';
+import StarBorderOutlinedIcon from '@mui/icons-material/StarBorderOutlined';
 import GameDetails from './GameDetails';
 
 // Helper function to decode HTML entities and preserve line breaks
@@ -99,12 +105,42 @@ const GameCard = memo(({ game, onClick, sortBy }) => (
       <Typography variant="h6" sx={{ fontSize: '1rem', mb: 0.5 }}>
         {game.name}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-        {getRankLabel(sortBy)}: {game[sortBy] || 'Unranked'}
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        Published: {game.year_published || 'Unknown'}
-      </Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: '0.7fr auto', gap: 0.5 }}>
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+            <PeopleIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary">
+              {game.min_players === game.max_players ? game.min_players : `${game.min_players}-${game.max_players}`}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+            <AccessTimeIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary">
+              {game.min_playtime === game.max_playtime ? `${game.min_playtime} min` : `${game.min_playtime}-${game.max_playtime} min`}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <PsychologyAltOutlinedIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary">
+              {game.average_weight ? `${game.average_weight.toFixed(1)}/5` : 'N/A'}
+            </Typography>
+          </Box>
+        </Box>
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+            <EmojiEventsIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary">
+              {game[sortBy] || 'Unranked'}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <StarBorderOutlinedIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary">
+              {game.average ? game.average.toFixed(1) : 'N/A'}
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
     </CardContent>
   </Card>
 ));
@@ -144,6 +180,8 @@ const GameList = () => {
   const [artistId, setArtistId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const gamesPerPage = 24;
+  const [selectedDesigner, setSelectedDesigner] = useState(null);
+  const [selectedArtist, setSelectedArtist] = useState(null);
 
   // Remove page parameter from URL on mount
   useEffect(() => {
@@ -225,16 +263,78 @@ const GameList = () => {
     }
   };
 
-  const handleFilter = (type, id) => {
+  const handleFilter = (type, id, name) => {
     if (type === 'designer') {
       setDesignerId(id);
+      setSelectedDesigner({ boardgamedesigner_id: id, boardgamedesigner_name: name });
       setArtistId(null);
+      setSelectedArtist(null);
       setSearchTerm('');
     } else if (type === 'artist') {
       setArtistId(id);
+      setSelectedArtist({ boardgameartist_id: id, boardgameartist_name: name });
       setDesignerId(null);
+      setSelectedDesigner(null);
       setSearchTerm('');
     }
+  };
+
+  const handleRemoveFilter = (type) => {
+    if (type === 'designer') {
+      setDesignerId(null);
+      setSelectedDesigner(null);
+    } else if (type === 'artist') {
+      setArtistId(null);
+      setSelectedArtist(null);
+    }
+  };
+
+  const renderFilterChips = () => {
+    const chips = [];
+    
+    if (selectedDesigner) {
+      chips.push(
+        <Chip
+          key="designer"
+          label={`Designer: ${selectedDesigner.boardgamedesigner_name}`}
+          onDelete={() => handleRemoveFilter('designer')}
+          color="primary"
+          sx={{ m: 0.5 }}
+        />
+      );
+    }
+    
+    if (selectedArtist) {
+      chips.push(
+        <Chip
+          key="artist"
+          label={`Artist: ${selectedArtist.boardgameartist_name}`}
+          onDelete={() => handleRemoveFilter('artist')}
+          color="primary"
+          sx={{ m: 0.5 }}
+        />
+      );
+    }
+
+    if (selectedMechanics.length > 0) {
+      selectedMechanics.forEach(mechanic => {
+        chips.push(
+          <Chip
+            key={`mechanic-${mechanic.boardgamemechanic_id}`}
+            label={`Mechanic: ${mechanic.boardgamemechanic_name}`}
+            onDelete={() => setSelectedMechanics(prev => prev.filter(m => m.boardgamemechanic_id !== mechanic.boardgamemechanic_id))}
+            color="primary"
+            sx={{ m: 0.5 }}
+          />
+        );
+      });
+    }
+
+    return chips.length > 0 ? (
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+        {chips}
+      </Box>
+    ) : null;
   };
 
   const renderGameGrid = () => {
@@ -300,6 +400,7 @@ const GameList = () => {
               </Select>
             </FormControl>
           </Box>
+          {renderFilterChips()}
           {renderGameGrid()}
         </Box>
         <Box sx={{ width: 300 }}>
