@@ -542,11 +542,16 @@ const GameList = () => {
             </Typography>
             <Autocomplete
               multiple
-              options={mechanics}
-              getOptionLabel={(option) => `${option.boardgamemechanic_name} (${option.count})`}
-              value={selectedMechanics}
+              options={mechanics
+                .filter(m => !selectedMechanics.some(sm => sm.boardgamemechanic_id === m.boardgamemechanic_id))
+                .sort((a, b) => a.boardgamemechanic_name.localeCompare(b.boardgamemechanic_name))}
+              getOptionLabel={(option) => option.boardgamemechanic_name}
+              value={[]}
               onChange={(event, newValue) => {
-                setSelectedMechanics(newValue);
+                if (newValue && newValue.length > 0) {
+                  const selected = newValue[0];
+                  setSelectedMechanics(prev => [...prev, selected]);
+                }
               }}
               renderInput={(params) => (
                 <TextField
@@ -555,17 +560,11 @@ const GameList = () => {
                   placeholder="Select mechanics"
                 />
               )}
-              renderOption={(props, option) => {
-                const { key, ...otherProps } = props;
-                return (
-                  <li key={option.boardgamemechanic_id} {...otherProps}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                      <Typography>{option.boardgamemechanic_name}</Typography>
-                      <Typography color="text.secondary">({option.count})</Typography>
-                    </Box>
-                  </li>
-                );
-              }}
+              renderOption={(props, option) => (
+                <li {...props}>
+                  <Typography>{option.boardgamemechanic_name}</Typography>
+                </li>
+              )}
             />
           </FormControl>
         </Box>
