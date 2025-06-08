@@ -186,6 +186,7 @@ class Mechanic(MechanicBase):
 
 class BoardGameList(BoardGameBase):
     mechanics: List[MechanicBase] = []
+    categories: List[CategoryBase] = []
     suggested_players: List[SuggestedPlayerBase] = []
 
     model_config = ConfigDict(from_attributes=True)

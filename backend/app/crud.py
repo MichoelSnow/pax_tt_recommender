@@ -21,7 +21,8 @@ def get_games(
     artist_id: Optional[int] = None,
     recommendations: Optional[str] = None,
     weight: Optional[str] = None,
-    mechanics: Optional[str] = None
+    mechanics: Optional[str] = None,
+    categories: Optional[str] = None
 ):
     try:
         # Start with a base query that only loads the main game fields
@@ -30,6 +31,10 @@ def get_games(
             joinedload(models.BoardGame.mechanics).load_only(
                 models.Mechanic.boardgamemechanic_id,
                 models.Mechanic.boardgamemechanic_name
+            ),
+            joinedload(models.BoardGame.categories).load_only(
+                models.Category.boardgamecategory_id,
+                models.Category.boardgamecategory_name
             ),
             joinedload(models.BoardGame.suggested_players).load_only(
                 models.SuggestedPlayer.player_count,
@@ -51,6 +56,11 @@ def get_games(
             mechanic_ids = mechanics.split(',')
             for m_id in mechanic_ids:
                 query = query.join(models.BoardGame.mechanics).filter(models.Mechanic.boardgamemechanic_id == int(m_id))
+
+        if categories:
+            category_ids = categories.split(',')
+            for c_id in category_ids:
+                query = query.join(models.BoardGame.categories).filter(models.Category.boardgamecategory_id == int(c_id))
 
         if players:
             query = query.join(models.BoardGame.suggested_players).filter(

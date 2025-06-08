@@ -82,7 +82,8 @@ async def list_games(
     artist_id: Optional[int] = None,
     recommendations: Optional[str] = None,
     weight: Optional[str] = None,
-    mechanics: Optional[str] = None
+    mechanics: Optional[str] = None,
+    categories: Optional[str] = None
 ):
     try:
         games, total = crud.get_games(
@@ -96,7 +97,8 @@ async def list_games(
             artist_id=artist_id,
             recommendations=recommendations,
             weight=weight,
-            mechanics=mechanics
+            mechanics=mechanics,
+            categories=categories
         )
         return {"games": games, "total": total}
     except Exception as e:

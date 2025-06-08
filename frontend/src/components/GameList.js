@@ -173,6 +173,7 @@ const GameList = () => {
     heavy: false
   });
   const [selectedMechanics, setSelectedMechanics] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedGame, setSelectedGame] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [sortBy, setSortBy] = useState('rank');
@@ -203,7 +204,7 @@ const GameList = () => {
 
   // Fetch games with filters
   const { data: response = { games: [], total: 0 }, isLoading, error, isFetching } = useQuery({
-    queryKey: ['games', searchTerm, playerCount, recommendations, selectedMechanics, weight, sortBy, designerId, artistId, currentPage],
+    queryKey: ['games', searchTerm, playerCount, recommendations, selectedMechanics, selectedCategories, weight, sortBy, designerId, artistId, currentPage],
     queryFn: async () => {
       const params = {
         limit: gamesPerPage,
@@ -236,6 +237,10 @@ const GameList = () => {
         params.mechanics = selectedMechanics.map(m => m.boardgamemechanic_id).join(',');
       }
 
+      if (selectedCategories.length > 0) {
+        params.categories = selectedCategories.map(c => c.boardgamecategory_id).join(',');
+      }
+
       const response = await axios.get('http://localhost:8000/games', { params });
       return response.data;
     },
@@ -247,7 +252,7 @@ const GameList = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, playerCount, recommendations, selectedMechanics, weight, sortBy, designerId, artistId]);
+  }, [searchTerm, playerCount, recommendations, selectedMechanics, selectedCategories, weight, sortBy, designerId, artistId]);
 
   const handlePageChange = (event, newPage) => {
     setCurrentPage(newPage);
@@ -264,18 +269,26 @@ const GameList = () => {
   };
 
   const handleFilter = (type, id, name) => {
+    // Clear all filters first
+    setDesignerId(null);
+    setSelectedDesigner(null);
+    setArtistId(null);
+    setSelectedArtist(null);
+    setSelectedMechanics([]);
+    setSelectedCategories([]);
+    setSearchTerm('');
+
+    // Then set the selected filter
     if (type === 'designer') {
       setDesignerId(id);
       setSelectedDesigner({ boardgamedesigner_id: id, boardgamedesigner_name: name });
-      setArtistId(null);
-      setSelectedArtist(null);
-      setSearchTerm('');
     } else if (type === 'artist') {
       setArtistId(id);
       setSelectedArtist({ boardgameartist_id: id, boardgameartist_name: name });
-      setDesignerId(null);
-      setSelectedDesigner(null);
-      setSearchTerm('');
+    } else if (type === 'mechanic') {
+      setSelectedMechanics([{ boardgamemechanic_id: id, boardgamemechanic_name: name }]);
+    } else if (type === 'category') {
+      setSelectedCategories([{ boardgamecategory_id: id, boardgamecategory_name: name }]);
     }
   };
 
@@ -286,6 +299,10 @@ const GameList = () => {
     } else if (type === 'artist') {
       setArtistId(null);
       setSelectedArtist(null);
+    } else if (type === 'mechanic') {
+      setSelectedMechanics([]);
+    } else if (type === 'category') {
+      setSelectedCategories([]);
     }
   };
 
@@ -322,7 +339,21 @@ const GameList = () => {
           <Chip
             key={`mechanic-${mechanic.boardgamemechanic_id}`}
             label={`Mechanic: ${mechanic.boardgamemechanic_name}`}
-            onDelete={() => setSelectedMechanics(prev => prev.filter(m => m.boardgamemechanic_id !== mechanic.boardgamemechanic_id))}
+            onDelete={() => handleRemoveFilter('mechanic')}
+            color="primary"
+            sx={{ m: 0.5 }}
+          />
+        );
+      });
+    }
+
+    if (selectedCategories.length > 0) {
+      selectedCategories.forEach(category => {
+        chips.push(
+          <Chip
+            key={`category-${category.boardgamecategory_id}`}
+            label={`Category: ${category.boardgamecategory_name}`}
+            onDelete={() => handleRemoveFilter('category')}
             color="primary"
             sx={{ m: 0.5 }}
           />
