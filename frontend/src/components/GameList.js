@@ -380,10 +380,17 @@ const GameList = () => {
           <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
             <TextField
               fullWidth
-              label="Search games"
               variant="outlined"
+              placeholder="Search by game title"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
             />
             <FormControl sx={{ minWidth: 200 }}>
               <InputLabel>Sort By Rank</InputLabel>
