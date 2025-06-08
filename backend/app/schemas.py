@@ -80,8 +80,8 @@ class SuggestedPlayerBase(BaseModel):
 
 
 class LanguageDependenceBase(BaseModel):
-    level: str
-    votes: int
+    level: Optional[str] = None
+    votes: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
