@@ -69,18 +69,6 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
     );
   };
 
-  const rankCategories = [
-    { value: 'rank', label: 'Overall Rank' },
-    { value: 'abstracts_rank', label: 'Abstract Games' },
-    { value: 'cgs_rank', label: 'Customizable Games' },
-    { value: 'childrens_games_rank', label: "Children's Games" },
-    { value: 'family_games_rank', label: 'Family Games' },
-    { value: 'party_games_rank', label: 'Party Games' },
-    { value: 'strategy_games_rank', label: 'Strategy Games' },
-    { value: 'thematic_rank', label: 'Thematic Games' },
-    { value: 'wargames_rank', label: 'Wargames' }
-  ];
-
   return (
     <Dialog
       open={open}
@@ -106,30 +94,12 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
           )}
           <Box>
             <Typography variant="h5">{game.name}</Typography>
-            <Typography variant="subtitle1" color="text.secondary">
-              Published: {game.year_published || 'Unknown'}
-            </Typography>
           </Box>
         </Box>
       </DialogTitle>
       <DialogContent dividers>
         <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle1" gutterBottom>
-              Game Details
-            </Typography>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2">
-                Players: {game.min_players}-{game.max_players}
-              </Typography>
-              <Typography variant="body2">
-                Playing Time: {game.playing_time} minutes
-              </Typography>
-              <Typography variant="body2">
-                Min Age: {game.min_age}+
-              </Typography>
-            </Box>
-            <Divider sx={{ my: 2 }} />
             {renderList(game.designers, 'Designers', 'designer')}
             {renderList(game.artists, 'Artists', 'artist')}
             {renderList(game.mechanics, 'Mechanics', 'mechanic')}
@@ -137,39 +107,6 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
             {renderList(game.publishers, 'Publishers', 'publisher')}
           </Grid>
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle1" gutterBottom>
-              Statistics
-            </Typography>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2">
-                Average Rating: {game.average?.toFixed(2) || 'N/A'}
-              </Typography>
-              <Typography variant="body2">
-                Number of Ratings: {game.num_ratings?.toLocaleString() || 'N/A'}
-              </Typography>
-              <Typography variant="body2">
-                Average Weight: {game.average_weight?.toFixed(2) || 'N/A'}
-              </Typography>
-              <Typography variant="body2">
-                Number of Comments: {game.num_comments?.toLocaleString() || 'N/A'}
-              </Typography>
-            </Box>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle1" gutterBottom>
-              Rankings
-            </Typography>
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Grid container spacing={1}>
-                {rankCategories.map((category) => (
-                  <Grid item xs={12} sm={6} key={category.value}>
-                    <Typography variant="body2">
-                      {category.label}: {game[category.value] || 'Unranked'}
-                    </Typography>
-                  </Grid>
-                ))}
-              </Grid>
-            </Paper>
-            <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle1" gutterBottom>
               Description
             </Typography>
