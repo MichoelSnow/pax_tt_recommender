@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.sql import or_, and_
 from . import models, schemas
 from typing import List, Optional
@@ -17,8 +17,8 @@ def get_games(
     sort_by: Optional[str] = "rank",
     search: Optional[str] = None,
     players: Optional[int] = None,
-    designer_id: Optional[int] = None,
-    artist_id: Optional[int] = None,
+    designer_id: Optional[str] = None,
+    artist_id: Optional[str] = None,
     recommendations: Optional[str] = None,
     weight: Optional[str] = None,
     mechanics: Optional[str] = None,
@@ -47,20 +47,56 @@ def get_games(
             query = query.filter(models.BoardGame.name.ilike(search_term))
 
         if designer_id:
-            query = query.join(models.BoardGame.designers).filter(models.Designer.boardgamedesigner_id == designer_id)
-        
+            designer_ids = [int(d_id) for d_id in designer_id.split(',')]
+            subquery = select(models.BoardGame.id).join(
+                models.BoardGame.designers
+            ).filter(
+                models.Designer.boardgamedesigner_id.in_(designer_ids)
+            ).group_by(
+                models.BoardGame.id
+            ).having(
+                func.count(models.Designer.boardgamedesigner_id) == len(designer_ids)
+            ).subquery()
+            query = query.filter(models.BoardGame.id.in_(subquery))
+
         if artist_id:
-            query = query.join(models.BoardGame.artists).filter(models.Artist.boardgameartist_id == artist_id)
+            artist_ids = [int(a_id) for a_id in artist_id.split(',')]
+            subquery = select(models.BoardGame.id).join(
+                models.BoardGame.artists
+            ).filter(
+                models.Artist.boardgameartist_id.in_(artist_ids)
+            ).group_by(
+                models.BoardGame.id
+            ).having(
+                func.count(models.Artist.boardgameartist_id) == len(artist_ids)
+            ).subquery()
+            query = query.filter(models.BoardGame.id.in_(subquery))
 
         if mechanics:
-            mechanic_ids = mechanics.split(',')
-            for m_id in mechanic_ids:
-                query = query.join(models.BoardGame.mechanics).filter(models.Mechanic.boardgamemechanic_id == int(m_id))
+            mechanic_ids = [int(m_id) for m_id in mechanics.split(',')]
+            subquery = select(models.BoardGame.id).join(
+                models.BoardGame.mechanics
+            ).filter(
+                models.Mechanic.boardgamemechanic_id.in_(mechanic_ids)
+            ).group_by(
+                models.BoardGame.id
+            ).having(
+                func.count(models.Mechanic.boardgamemechanic_id) == len(mechanic_ids)
+            ).subquery()
+            query = query.filter(models.BoardGame.id.in_(subquery))
 
         if categories:
-            category_ids = categories.split(',')
-            for c_id in category_ids:
-                query = query.join(models.BoardGame.categories).filter(models.Category.boardgamecategory_id == int(c_id))
+            category_ids = [int(c_id) for c_id in categories.split(',')]
+            subquery = select(models.BoardGame.id).join(
+                models.BoardGame.categories
+            ).filter(
+                models.Category.boardgamecategory_id.in_(category_ids)
+            ).group_by(
+                models.BoardGame.id
+            ).having(
+                func.count(models.Category.boardgamecategory_id) == len(category_ids)
+            ).subquery()
+            query = query.filter(models.BoardGame.id.in_(subquery))
 
         if players:
             query = query.join(models.BoardGame.suggested_players).filter(
@@ -102,6 +138,7 @@ def get_games(
 
         # Get total count before pagination
         total = query.count()
+        logger.info(f"Total count before pagination: {total}")
 
         # Verify that the sort_by field exists in the model
         if not hasattr(models.BoardGame, sort_by):
@@ -116,6 +153,7 @@ def get_games(
 
         # Apply pagination
         games = query.offset(skip).limit(limit).all()
+        logger.info(f"Number of games returned: {len(games)}")
         
         return games, total
     except Exception as e:
