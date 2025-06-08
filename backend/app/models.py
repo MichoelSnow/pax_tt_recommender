@@ -45,20 +45,20 @@ class BoardGame(Base):
     thematic_rank = Column(Integer)
     wargames_rank = Column(Integer)
     
-    # Relationships
-    mechanics = relationship("Mechanic", back_populates="game")
-    categories = relationship("Category", back_populates="game")
-    designers = relationship("Designer", back_populates="game")
-    artists = relationship("Artist", back_populates="game")
-    publishers = relationship("Publisher", back_populates="game")
-    suggested_players = relationship("SuggestedPlayer", back_populates="game")
-    language_dependence = relationship("LanguageDependence", back_populates="game", uselist=False)
-    integrations = relationship("Integration", back_populates="game")
-    implementations = relationship("Implementation", back_populates="game")
-    compilations = relationship("Compilation", back_populates="game")
-    expansions = relationship("Expansion", back_populates="game")
-    families = relationship("Family", back_populates="game")
-    versions = relationship("Version", back_populates="game")
+    # Relationships - all lazy loaded by default
+    mechanics = relationship("Mechanic", back_populates="game", lazy="select")
+    categories = relationship("Category", back_populates="game", lazy="select")
+    designers = relationship("Designer", back_populates="game", lazy="select")
+    artists = relationship("Artist", back_populates="game", lazy="select")
+    publishers = relationship("Publisher", back_populates="game", lazy="select")
+    suggested_players = relationship("SuggestedPlayer", back_populates="game", lazy="select")
+    language_dependence = relationship("LanguageDependence", back_populates="game", uselist=False, lazy="select")
+    integrations = relationship("Integration", back_populates="game", lazy="select")
+    implementations = relationship("Implementation", back_populates="game", lazy="select")
+    compilations = relationship("Compilation", back_populates="game", lazy="select")
+    expansions = relationship("Expansion", back_populates="game", lazy="select")
+    families = relationship("Family", back_populates="game", lazy="select")
+    versions = relationship("Version", back_populates="game", lazy="select")
 
 class Mechanic(Base):
     __tablename__ = 'mechanics'

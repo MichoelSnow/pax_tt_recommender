@@ -195,7 +195,7 @@ const GameList = () => {
       }
 
       if (selectedMechanics.length > 0) {
-        params.mechanics = selectedMechanics.map(m => m.name).join(',');
+        params.mechanics = selectedMechanics.map(m => m.boardgamemechanic_id).join(',');
       }
 
       const response = await axios.get('http://localhost:8000/games', { params });
@@ -400,7 +400,7 @@ const GameList = () => {
             <Autocomplete
               multiple
               options={mechanics}
-              getOptionLabel={(option) => `${option.name} (${option.count})`}
+              getOptionLabel={(option) => `${option.boardgamemechanic_name} (${option.count})`}
               value={selectedMechanics}
               onChange={(event, newValue) => {
                 setSelectedMechanics(newValue);
@@ -415,9 +415,9 @@ const GameList = () => {
               renderOption={(props, option) => {
                 const { key, ...otherProps } = props;
                 return (
-                  <li key={option.name} {...otherProps}>
+                  <li key={option.boardgamemechanic_id} {...otherProps}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                      <Typography>{option.name}</Typography>
+                      <Typography>{option.boardgamemechanic_name}</Typography>
                       <Typography color="text.secondary">({option.count})</Typography>
                     </Box>
                   </li>

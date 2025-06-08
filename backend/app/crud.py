@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from sqlalchemy.sql import or_, and_
 from . import models, schemas
@@ -13,49 +13,44 @@ logger = logging.getLogger(__name__)
 def get_games(
     db: Session,
     skip: int = 0,
-    limit: int = 100,
-    designer: Optional[str] = None,
-    designer_id: Optional[int] = None,
-    artist_id: Optional[int] = None,
-    mechanic: Optional[str] = None,
-    mechanics: Optional[str] = None,
-    category: Optional[str] = None,
-    publisher: Optional[str] = None,
+    limit: int = 24,
+    sort_by: Optional[str] = "rank",
     search: Optional[str] = None,
     players: Optional[int] = None,
+    designer_id: Optional[int] = None,
+    artist_id: Optional[int] = None,
     recommendations: Optional[str] = None,
     weight: Optional[str] = None,
-    sort_by: Optional[str] = "rank"
+    mechanics: Optional[str] = None
 ):
     try:
-        query = db.query(models.BoardGame)
+        # Start with a base query that only loads the main game fields
+        query = db.query(models.BoardGame).options(
+            # Only load the relationships needed for filtering
+            joinedload(models.BoardGame.mechanics).load_only(
+                models.Mechanic.boardgamemechanic_id,
+                models.Mechanic.boardgamemechanic_name
+            ),
+            joinedload(models.BoardGame.suggested_players).load_only(
+                models.SuggestedPlayer.player_count,
+                models.SuggestedPlayer.recommendation
+            )
+        )
 
         if search:
             search_term = f"%{search}%"
             query = query.filter(models.BoardGame.name.ilike(search_term))
 
-        if designer:
-            query = query.join(models.BoardGame.designers).filter(models.Designer.name == designer)
-        
         if designer_id:
             query = query.join(models.BoardGame.designers).filter(models.Designer.boardgamedesigner_id == designer_id)
         
         if artist_id:
             query = query.join(models.BoardGame.artists).filter(models.Artist.boardgameartist_id == artist_id)
 
-        if mechanic:
-            query = query.join(models.BoardGame.mechanics).filter(models.Mechanic.name == mechanic)
-
         if mechanics:
-            mechanic_list = mechanics.split(',')
-            for m in mechanic_list:
-                query = query.join(models.BoardGame.mechanics).filter(models.Mechanic.name == m)
-
-        if category:
-            query = query.join(models.BoardGame.categories).filter(models.Category.name == category)
-
-        if publisher:
-            query = query.join(models.BoardGame.publishers).filter(models.Publisher.name == publisher)
+            mechanic_ids = mechanics.split(',')
+            for m_id in mechanic_ids:
+                query = query.join(models.BoardGame.mechanics).filter(models.Mechanic.boardgamemechanic_id == int(m_id))
 
         if players:
             query = query.join(models.BoardGame.suggested_players).filter(
