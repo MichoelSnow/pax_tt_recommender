@@ -77,17 +77,8 @@ function Navbar({ onSearch }) {
           component="div"
           sx={{ display: { xs: 'none', sm: 'block' } }}
         >
-          Board Game Recommender
+          PAX TableTop Board Game Catalog
         </Typography>
-        <Search>
-          <SearchIconWrapper>
-            <SearchIcon />
-          </SearchIconWrapper>
-          <StyledInputBase
-            placeholder="Search games..."
-            onKeyPress={handleSearch}
-          />
-        </Search>
       </Toolbar>
     </AppBar>
   );

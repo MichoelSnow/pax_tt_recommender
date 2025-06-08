@@ -103,7 +103,7 @@ const GameCard = memo(({ game, onClick, sortBy }) => (
     />
     <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
       <Typography variant="h6" sx={{ fontSize: '1rem', mb: 0.5 }}>
-        {game.name}
+        {game.name.length > 100 ? `${game.name.substring(0, 100)}...` : game.name}
       </Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: '0.7fr auto', gap: 0.5 }}>
         <Box>
@@ -181,6 +181,19 @@ const GameList = () => {
   const [sortBy, setSortBy] = useState('rank');
   const [currentPage, setCurrentPage] = useState(1);
   const gamesPerPage = 24;
+
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    debounce((value) => {
+      setSearchTerm(value);
+    }, 500),
+    []
+  );
+
+  // Handle search input change
+  const handleSearchChange = (event) => {
+    debouncedSearch(event.target.value);
+  };
 
   // Remove page parameter from URL on mount
   useEffect(() => {
@@ -427,8 +440,7 @@ const GameList = () => {
               fullWidth
               variant="outlined"
               placeholder="Search by game title"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearchChange}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
