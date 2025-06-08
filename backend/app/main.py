@@ -104,9 +104,9 @@ async def list_games(
         raise HTTPException(status_code=500, detail="Error fetching games")
 
 @app.get("/games/{game_id}", response_model=schemas.BoardGameOut)
-async def get_game(game_id: int):
+async def get_game(game_id: int, db: Session = Depends(get_db)):
     try:
-        game = crud.get_game(game_id)
+        game = crud.get_game(db, game_id)
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
         return game
