@@ -70,7 +70,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 async def root():
     return {"message": "Board Game Recommender API"}
 
-@app.get("/games/", response_model=List[schemas.BoardGameList])
+@app.get("/games/", response_model=schemas.GameListResponse)
 async def list_games(
     db: Session = Depends(get_db),
     skip: int = 0,
@@ -85,7 +85,7 @@ async def list_games(
     mechanics: Optional[str] = None
 ):
     try:
-        games = crud.get_games(
+        games, total = crud.get_games(
             db=db,
             skip=skip,
             limit=limit,
@@ -98,7 +98,7 @@ async def list_games(
             weight=weight,
             mechanics=mechanics
         )
-        return games
+        return {"games": games, "total": total}
     except Exception as e:
         logger.error(f"Error fetching games: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error fetching games")

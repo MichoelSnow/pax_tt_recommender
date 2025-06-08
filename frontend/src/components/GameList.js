@@ -164,7 +164,7 @@ const GameList = () => {
   });
 
   // Fetch games with filters
-  const { data: games = [], isLoading, error, isFetching } = useQuery({
+  const { data: response = { games: [], total: 0 }, isLoading, error, isFetching } = useQuery({
     queryKey: ['games', searchTerm, playerCount, recommendations, selectedMechanics, weight, sortBy, designerId, artistId, currentPage],
     queryFn: async () => {
       const params = {
@@ -203,6 +203,8 @@ const GameList = () => {
     },
     keepPreviousData: true,
   });
+
+  const { games = [], total = 0 } = response;
 
   // Reset page when filters change
   useEffect(() => {
@@ -267,18 +269,6 @@ const GameList = () => {
             </Grid>
           ))}
         </Grid>
-        {games.length >= gamesPerPage && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-            <Pagination
-              count={10}
-              page={currentPage}
-              onChange={handlePageChange}
-              color="primary"
-              size={isMobile ? "small" : "large"}
-              disabled={isFetching}
-            />
-          </Box>
-        )}
       </>
     );
   };
@@ -427,6 +417,18 @@ const GameList = () => {
           </FormControl>
         </Box>
       </Box>
+      {total > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <Pagination
+            count={Math.ceil(total / gamesPerPage)}
+            page={currentPage}
+            onChange={handlePageChange}
+            color="primary"
+            size={isMobile ? "small" : "large"}
+            disabled={isFetching}
+          />
+        </Box>
+      )}
       <GameDetails
         game={selectedGame}
         open={detailsOpen}

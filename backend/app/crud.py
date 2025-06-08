@@ -90,6 +90,9 @@ def get_games(
             if weight_conditions:
                 query = query.filter(or_(*weight_conditions))
 
+        # Get total count before pagination
+        total = query.count()
+
         # Verify that the sort_by field exists in the model
         if not hasattr(models.BoardGame, sort_by):
             raise ValueError(f"Invalid sort field: {sort_by}")
@@ -98,7 +101,10 @@ def get_games(
         rank_field = getattr(models.BoardGame, sort_by)
         query = query.order_by(rank_field.asc().nullslast())
 
-        return query.offset(skip).limit(limit).all()
+        # Apply pagination
+        games = query.offset(skip).limit(limit).all()
+        
+        return games, total
     except Exception as e:
         logger.error(f"Error in get_games: {str(e)}")
         raise
