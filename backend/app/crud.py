@@ -101,6 +101,9 @@ def get_games(
         rank_field = getattr(models.BoardGame, sort_by)
         query = query.order_by(rank_field.asc().nullslast())
 
+        # Log the query
+        logger.info(f"SQL Query: {query}")
+
         # Apply pagination
         games = query.offset(skip).limit(limit).all()
         

@@ -52,7 +52,7 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
                 label={name}
                 size="small"
                 onClick={isClickable ? () => {
-                  onFilter(type, id);
+                  onFilter(type, id, name);
                   onClose();
                 } : undefined}
                 sx={isClickable ? {
