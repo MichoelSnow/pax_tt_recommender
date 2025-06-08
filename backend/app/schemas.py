@@ -75,7 +75,6 @@ class PublisherBase(BaseModel):
 class SuggestedPlayerBase(BaseModel):
     player_count: int
     recommendation: str
-    votes: int
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -146,19 +145,19 @@ class BoardGameCreate(BoardGameBase):
 
 
 class BoardGameOut(BoardGameBase):
-    mechanics: List[dict] = []
-    categories: List[dict] = []
-    designers: List[dict] = []
-    artists: List[dict] = []
-    publishers: List[dict] = []
-    suggested_players: List[dict] = []
-    language_dependence: Optional[dict] = None
-    integrations: List[dict] = []
-    implementations: List[dict] = []
-    compilations: List[dict] = []
-    expansions: List[dict] = []
-    families: List[dict] = []
-    versions: List[dict] = []
+    mechanics: Optional[List[MechanicBase]]
+    categories: Optional[List[CategoryBase]]
+    designers: Optional[List[DesignerBase]]
+    artists: Optional[List[ArtistBase]]
+    publishers: Optional[List[PublisherBase]]
+    suggested_players: Optional[List[SuggestedPlayerBase]]
+    language_dependence: Optional[LanguageDependenceBase]
+    integrations: Optional[List[IntegrationBase]]
+    implementations: Optional[List[ImplementationBase]]
+    compilations: Optional[List[CompilationBase]]
+    expansions: Optional[List[ExpansionBase]]
+    families: Optional[List[FamilyBase]]
+    versions: Optional[List[VersionBase]]
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -181,5 +180,12 @@ class MechanicFrequency(BaseModel):
 
 class Mechanic(MechanicBase):
     game_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BoardGameList(BoardGameBase):
+    mechanics: Optional[List[MechanicBase]] = None
+    suggested_players: Optional[List[SuggestedPlayerBase]] = None
 
     model_config = ConfigDict(from_attributes=True)

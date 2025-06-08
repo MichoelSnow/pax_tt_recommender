@@ -1,11 +1,12 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from typing import List, Optional
 import logging
+from sqlalchemy.orm import Session
 from . import crud, models, schemas
-from .database import engine
+from .database import engine, SessionLocal
 
 # Configure logging
 logging.basicConfig(
@@ -31,6 +32,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Dependency to get database session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # Exception handlers
 @app.exception_handler(RequestValidationError)
@@ -61,41 +70,33 @@ async def general_exception_handler(request: Request, exc: Exception):
 async def root():
     return {"message": "Board Game Recommender API"}
 
-@app.get("/games/", response_model=List[schemas.BoardGameOut])
+@app.get("/games/", response_model=List[schemas.BoardGameList])
 async def list_games(
+    db: Session = Depends(get_db),
     skip: int = 0,
-    limit: int = 50,
-    sort_by: Optional[str] = None,
-    sort_order: Optional[str] = None,
-    min_players: Optional[int] = None,
-    max_players: Optional[int] = None,
-    min_playtime: Optional[int] = None,
-    max_playtime: Optional[int] = None,
-    min_age: Optional[int] = None,
-    year_published: Optional[int] = None,
-    mechanics: Optional[List[str]] = None,
-    categories: Optional[List[str]] = None,
-    designers: Optional[List[str]] = None,
-    publishers: Optional[List[str]] = None,
-    search: Optional[str] = None
+    limit: int = 24,
+    sort_by: Optional[str] = "rank",
+    search: Optional[str] = None,
+    players: Optional[int] = None,
+    designer_id: Optional[int] = None,
+    artist_id: Optional[int] = None,
+    recommendations: Optional[str] = None,
+    weight: Optional[str] = None,
+    mechanics: Optional[str] = None
 ):
     try:
         games = crud.get_games(
+            db=db,
             skip=skip,
             limit=limit,
             sort_by=sort_by,
-            sort_order=sort_order,
-            min_players=min_players,
-            max_players=max_players,
-            min_playtime=min_playtime,
-            max_playtime=max_playtime,
-            min_age=min_age,
-            year_published=year_published,
-            mechanics=mechanics,
-            categories=categories,
-            designers=designers,
-            publishers=publishers,
-            search=search
+            search=search,
+            players=players,
+            designer_id=designer_id,
+            artist_id=artist_id,
+            recommendations=recommendations,
+            weight=weight,
+            mechanics=mechanics
         )
         return games
     except Exception as e:
@@ -132,4 +133,13 @@ async def get_filter_options():
     except Exception as e:
         logger.error(f"Error fetching filter options: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error fetching filter options")
+
+@app.get("/mechanics/", response_model=List[schemas.MechanicBase])
+async def list_mechanics(db: Session = Depends(get_db)):
+    try:
+        mechanics = db.query(models.Mechanic.boardgamemechanic_id, models.Mechanic.boardgamemechanic_name).distinct().all()
+        return [{"boardgamemechanic_id": m[0], "boardgamemechanic_name": m[1]} for m in mechanics]
+    except Exception as e:
+        logger.error(f"Error fetching mechanics: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error fetching mechanics")
 
