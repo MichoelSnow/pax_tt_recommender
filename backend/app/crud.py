@@ -38,7 +38,7 @@ def get_games(
             ),
             joinedload(models.BoardGame.suggested_players).load_only(
                 models.SuggestedPlayer.player_count,
-                models.SuggestedPlayer.recommendation
+                models.SuggestedPlayer.recommendation_level
             )
         )
 
@@ -106,18 +106,12 @@ def get_games(
         if recommendations:
             rec_list = recommendations.split(',')
             if 'best' in rec_list:
-                query = query.join(models.BoardGame.suggested_players).filter(
-                    and_(
-                        models.SuggestedPlayer.player_count == players,
-                        models.SuggestedPlayer.recommendation == 'best'
-                    )
+                query = query.filter(
+                    models.SuggestedPlayer.recommendation_level == 'best'
                 )
             if 'recommended' in rec_list:
-                query = query.join(models.BoardGame.suggested_players).filter(
-                    and_(
-                        models.SuggestedPlayer.player_count == players,
-                        models.SuggestedPlayer.recommendation == 'recommended'
-                    )
+                query = query.filter(
+                    models.SuggestedPlayer.recommendation_level == 'recommended'
                 )
 
         if weight:

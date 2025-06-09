@@ -193,7 +193,7 @@ def save_suggested_num_players(
     df_exploded.columns = [x.lower().replace(" ", "_") for x in df_exploded.columns]
     for col in df_exploded.columns:
         df_exploded[col] = df_exploded[col].astype(pd.Int64Dtype())
-    df_exploded["recommendation"] = df_exploded[
+    df_exploded["recommendation_level"] = df_exploded[
         ["best", "recommended", "not_recommended"]
     ].idxmax(axis=1)
     df_exploded = df_exploded.rename(

@@ -196,7 +196,7 @@ def create_related_objects(game_id: int, game_data: pd.Series, related_data: Dic
                 not_recommended=row['not_recommended'],
                 game_total_votes=row['game_total_votes'],
                 player_count_total_votes=row['total_votes'],
-                recommendation=row['recommendation']
+                recommendation_level=row['recommendation']
             ) for _, row in game_players.iterrows()]
             related_objects.extend(suggested_players)
     

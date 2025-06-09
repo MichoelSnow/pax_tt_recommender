@@ -116,7 +116,7 @@ class SuggestedPlayer(Base):
     not_recommended = Column(Integer)
     game_total_votes = Column(Integer)
     player_count_total_votes = Column(Integer)  # total votes for this player count
-    recommendation = Column(String)  # 'best', 'recommended', or 'not_recommended'
+    recommendation_level = Column(String)  # 'best', 'recommended', or 'not_recommended'
     game = relationship("BoardGame", back_populates="suggested_players")
 
 class LanguageDependence(Base):
