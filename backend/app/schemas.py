@@ -74,7 +74,7 @@ class PublisherBase(BaseModel):
 
 class SuggestedPlayerBase(BaseModel):
     player_count: int
-    recommendation: str
+    recommendation_level: str
 
     model_config = ConfigDict(from_attributes=True)
 
