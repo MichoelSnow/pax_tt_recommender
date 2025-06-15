@@ -1,9 +1,10 @@
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.exceptions import RequestValidationError
 from typing import List, Optional
 import logging
+import httpx
 from sqlalchemy.orm import Session
 from . import crud, models, schemas
 from .database import engine, SessionLocal
@@ -177,4 +178,24 @@ async def list_mechanics(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error fetching mechanics: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error fetching mechanics")
+
+@app.get("/proxy-image/{url:path}")
+async def proxy_image(url: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail="Failed to fetch image")
+            
+            return StreamingResponse(
+                response.iter_bytes(),
+                media_type=response.headers.get("content-type", "image/jpeg"),
+                headers={
+                    "Cache-Control": "public, max-age=31536000",
+                    "Access-Control-Allow-Origin": "*"
+                }
+            )
+    except Exception as e:
+        logger.error(f"Error proxying image {url}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error fetching image")
 

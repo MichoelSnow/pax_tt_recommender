@@ -41,6 +41,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PsychologyAltOutlinedIcon from '@mui/icons-material/PsychologyAltOutlined';
 import StarBorderOutlinedIcon from '@mui/icons-material/StarBorderOutlined';
 import GameDetails from './GameDetails';
+import GameCard from './GameCard';
 
 // Helper function to decode HTML entities and preserve line breaks
 const decodeHtmlEntities = (text) => {
@@ -75,75 +76,6 @@ const getRankLabel = (sortValue) => {
 
 // Generate player count options (1-12)
 const playerCountOptions = Array.from({ length: 12 }, (_, i) => i + 1);
-
-// Memoized GameCard component
-const GameCard = memo(({ game, onClick, sortBy }) => (
-  <Card 
-    sx={{ 
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      cursor: 'pointer',
-      '&:hover': {
-        boxShadow: 6
-      }
-    }}
-    onClick={onClick}
-  >
-    <CardMedia
-      component="img"
-      sx={{ 
-        height: 140,
-        objectFit: 'contain',
-        backgroundColor: '#f5f5f5'
-      }}
-      image={game.image || '/placeholder.png'}
-      alt={game.name}
-      loading="lazy"
-    />
-    <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
-      <Typography variant="h6" sx={{ fontSize: '1rem', mb: 0.5 }}>
-        {game.name.length > 100 ? `${game.name.substring(0, 100)}...` : game.name}
-      </Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: '0.7fr auto', gap: 0.5 }}>
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-            <PeopleIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-            <Typography variant="body2" color="text.secondary">
-              {game.min_players === game.max_players ? game.min_players : `${game.min_players}-${game.max_players}`}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-            <AccessTimeIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-            <Typography variant="body2" color="text.secondary">
-              {game.min_playtime === game.max_playtime ? `${game.min_playtime} min` : `${game.min_playtime}-${game.max_playtime} min`}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <PsychologyAltOutlinedIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-            <Typography variant="body2" color="text.secondary">
-              {game.average_weight ? `${game.average_weight.toFixed(1)}/5` : 'N/A'}
-            </Typography>
-          </Box>
-        </Box>
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-            <EmojiEventsIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-            <Typography variant="body2" color="text.secondary">
-              {game[sortBy] || 'Unranked'}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <StarBorderOutlinedIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-            <Typography variant="body2" color="text.secondary">
-              {game.average ? game.average.toFixed(1) : 'N/A'}
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
-    </CardContent>
-  </Card>
-));
 
 // Memoized GameCardSkeleton component
 const GameCardSkeleton = memo(() => (
@@ -402,7 +334,7 @@ const GameList = () => {
       return (
         <Grid container spacing={2}>
           {Array.from(new Array(12)).map((_, index) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={index}>
+            <Grid item xs={12} sm={6} md={4} key={index}>
               <GameCardSkeleton />
             </Grid>
           ))}
@@ -417,19 +349,17 @@ const GameList = () => {
     }
 
     return (
-      <>
-        <Grid container spacing={2}>
-          {games.map((game) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={game.id}>
-              <GameCard
-                game={game}
-                onClick={() => handleGameClick(game)}
-                sortBy={sortBy}
-              />
-            </Grid>
-          ))}
-        </Grid>
-      </>
+      <Grid container spacing={3}>
+        {games.map((game) => (
+          <Grid item xs={12} sm={6} md={4} key={game.id}>
+            <GameCard
+              game={game}
+              onClick={() => handleGameClick(game)}
+              sortBy={sortBy}
+            />
+          </Grid>
+        ))}
+      </Grid>
     );
   };
 

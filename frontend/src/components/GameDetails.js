@@ -12,11 +12,9 @@ import {
   Divider,
   Paper,
   CircularProgress,
-  Card,
-  CardMedia,
-  CardContent,
 } from '@mui/material';
 import axios from 'axios';
+import GameCard from './GameCard';
 import PeopleIcon from '@mui/icons-material/People';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PsychologyAltOutlinedIcon from '@mui/icons-material/PsychologyAltOutlined';
@@ -132,74 +130,14 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
     }
 
     return (
-      <Grid container spacing={2}>
+      <Grid container spacing={3}>
         {recommendations.map((rec) => (
           <Grid item xs={12} sm={6} md={4} key={rec.id}>
-            <Card 
-              sx={{ 
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                cursor: 'pointer',
-                '&:hover': {
-                  boxShadow: 6
-                }
-              }}
+            <GameCard
+              game={rec}
               onClick={() => handleRecommendationClick(rec)}
-            >
-              <CardMedia
-                component="img"
-                sx={{ 
-                  height: 140,
-                  objectFit: 'contain',
-                  backgroundColor: '#f5f5f5'
-                }}
-                image={rec.image || '/placeholder.png'}
-                alt={rec.name}
-                loading="lazy"
-              />
-              <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
-                <Typography variant="h6" sx={{ fontSize: '1rem', mb: 0.5 }}>
-                  {rec.name.length > 100 ? `${rec.name.substring(0, 100)}...` : rec.name}
-                </Typography>
-                <Box sx={{ display: 'grid', gridTemplateColumns: '0.7fr auto', gap: 0.5 }}>
-                  <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                      <PeopleIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-                      <Typography variant="body2" color="text.secondary">
-                        {rec.min_players === rec.max_players ? rec.min_players : `${rec.min_players}-${rec.max_players}`}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                      <AccessTimeIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-                      <Typography variant="body2" color="text.secondary">
-                        {rec.min_playtime === rec.max_playtime ? `${rec.min_playtime} min` : `${rec.min_playtime}-${rec.max_playtime} min`}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <PsychologyAltOutlinedIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-                      <Typography variant="body2" color="text.secondary">
-                        {rec.average_weight ? `${rec.average_weight.toFixed(1)}/5` : 'N/A'}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                      <EmojiEventsIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-                      <Typography variant="body2" color="text.secondary">
-                        {rec.rank || 'Unranked'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <StarBorderOutlinedIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-                      <Typography variant="body2" color="text.secondary">
-                        {rec.average ? rec.average.toFixed(1) : 'N/A'}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
+              sortBy="rank"
+            />
           </Grid>
         ))}
       </Grid>
