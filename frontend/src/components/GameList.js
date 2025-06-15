@@ -286,7 +286,9 @@ const GameList = () => {
   };
 
   const handleFilter = (type, id, name) => {
-    if (type === 'designer') {
+    if (type === 'game') {
+      handleGameClick({ id });
+    } else if (type === 'designer') {
       setSelectedDesigners(prev => {
         const exists = prev.some(d => d.boardgamedesigner_id === id);
         if (exists) {

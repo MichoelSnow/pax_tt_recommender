@@ -39,6 +39,8 @@ const decodeHtmlEntities = (text) => {
 const GameDetails = ({ game, open, onClose, onFilter }) => {
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedGame, setSelectedGame] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     const fetchRecommendations = async () => {
@@ -60,6 +62,16 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
   }, [game, open]);
 
   if (!game) return null;
+
+  const handleRecommendationClick = async (rec) => {
+    try {
+      const response = await axios.get(`http://localhost:8000/games/${rec.id}`);
+      onClose();
+      onFilter('game', rec.id, rec.name);
+    } catch (err) {
+      console.error('Failed to fetch recommended game:', err);
+    }
+  };
 
   const renderList = (items, label, type) => {
     if (!items || items.length === 0) return null;
@@ -133,17 +145,7 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
                   boxShadow: 6
                 }
               }}
-              onClick={() => {
-                onClose();
-                // Fetch and show the recommended game's details
-                axios.get(`http://localhost:8000/games/${rec.id}`)
-                  .then(response => {
-                    onFilter('game', rec.id, rec.name);
-                  })
-                  .catch(err => {
-                    console.error('Failed to fetch recommended game:', err);
-                  });
-              }}
+              onClick={() => handleRecommendationClick(rec)}
             >
               <CardMedia
                 component="img"
@@ -205,69 +207,82 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="md"
-      fullWidth
-      scroll="paper"
-    >
-      <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {game.image && (
-            <Box
-              component="img"
-              src={game.image}
-              alt={game.name}
-              sx={{
-                width: 100,
-                height: 100,
-                objectFit: 'contain',
-                backgroundColor: '#f5f5f5'
-              }}
-            />
-          )}
-          <Box>
-            <Typography variant="h5">{game.name}</Typography>
+    <>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="md"
+        fullWidth
+        scroll="paper"
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {game.image && (
+              <Box
+                component="img"
+                src={game.image}
+                alt={game.name}
+                sx={{
+                  width: 100,
+                  height: 100,
+                  objectFit: 'contain',
+                  backgroundColor: '#f5f5f5'
+                }}
+              />
+            )}
+            <Box>
+              <Typography variant="h5">{game.name}</Typography>
+            </Box>
           </Box>
-        </Box>
-      </DialogTitle>
-      <DialogContent dividers>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            {renderList(game.designers, 'Designers', 'designer')}
-            {renderList(game.artists, 'Artists', 'artist')}
-            {renderList(game.mechanics, 'Mechanics', 'mechanic')}
-            {renderList(game.categories, 'Categories', 'category')}
-            {renderList(game.publishers, 'Publishers', 'publisher')}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              {renderList(game.designers, 'Designers', 'designer')}
+              {renderList(game.artists, 'Artists', 'artist')}
+              {renderList(game.mechanics, 'Mechanics', 'mechanic')}
+              {renderList(game.categories, 'Categories', 'category')}
+              {renderList(game.publishers, 'Publishers', 'publisher')}
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle1" gutterBottom>
+                Description
+              </Typography>
+              <Typography 
+                variant="body1" 
+                sx={{ 
+                  whiteSpace: 'pre-line',
+                  mb: 2
+                }}
+              >
+                {decodeHtmlEntities(game.description)}
+              </Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle1" gutterBottom>
+                Similar Games
+              </Typography>
+              {renderRecommendations()}
+            </Grid>
           </Grid>
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle1" gutterBottom>
-              Description
-            </Typography>
-            <Typography 
-              variant="body1" 
-              sx={{ 
-                whiteSpace: 'pre-line',
-                mb: 2
-              }}
-            >
-              {decodeHtmlEntities(game.description)}
-            </Typography>
-          </Grid>
-          <Grid item xs={12}>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle1" gutterBottom>
-              Similar Games
-            </Typography>
-            {renderRecommendations()}
-          </Grid>
-        </Grid>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Close</Button>
-      </DialogActions>
-    </Dialog>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose}>Close</Button>
+        </DialogActions>
+      </Dialog>
+      {selectedGame && (
+        <GameDetails
+          game={selectedGame}
+          open={detailsOpen}
+          onClose={() => {
+            setDetailsOpen(false);
+            setSelectedGame(null);
+          }}
+          onFilter={onFilter}
+        />
+      )}
+    </>
   );
 };
 
