@@ -251,7 +251,8 @@ def main():
         timestamp = latest_ratings.stem.split("_")[-1]
 
         # Save game embeddings as npz
-        embeddings_path = data_dir / f"game_embeddings_{timestamp}.npz"
+        database_dir = Path(__file__).parent.parent.parent / "backend" / "database"
+        embeddings_path = database_dir / f"game_embeddings_{timestamp}.npz"
         sparse.save_npz(
             file=embeddings_path,
             matrix=recommender.game_embeddings,
@@ -259,7 +260,7 @@ def main():
         logger.info(f"Successfully saved embeddings to {embeddings_path}")
 
         # save reverse mappings as JSON
-        reverse_mappings_path = data_dir / f"reverse_mappings_{timestamp}.json"
+        reverse_mappings_path = database_dir / f"reverse_mappings_{timestamp}.json"
         with open(reverse_mappings_path, "w") as f:
             json.dump(recommender.reverse_game_mapping, f)
         logger.info(f"Successfully saved reverse mappings to {reverse_mappings_path}")

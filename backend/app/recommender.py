@@ -30,9 +30,9 @@ class ModelManager:
             return self._game_embeddings
 
         # Find the most recent embeddings file
-        data_dir = Path(__file__).parent.parent.parent / "data" / "crawler"
-        game_embeddings_files = list(data_dir.glob("game_embeddings_*.npz"))
-        reverse_mappings_files = list(data_dir.glob("reverse_mappings_*.json"))
+        database_dir = Path(__file__).parent.parent / "database"
+        game_embeddings_files = list(database_dir.glob("game_embeddings_*.npz"))
+        reverse_mappings_files = list(database_dir.glob("reverse_mappings_*.json"))
         if not game_embeddings_files:
             raise FileNotFoundError("No embeddings files found")
 
