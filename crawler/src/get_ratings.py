@@ -68,7 +68,7 @@ def get_boardgame_ratings(
 
     boardgame_master_dict = {}
     boardgame_data_ratings = boardgame_data.loc[boardgame_data["numratings"] > 100].sort_values(
-        by="numratings", ascending=False
+        by="numratings", ascending=True
     )
     boardgame_ids = boardgame_data_ratings["id"].tolist()
     # Check if there are any ids which have not had all their ratings pulled down yet
@@ -95,6 +95,8 @@ def get_boardgame_ratings(
             f"Found {len(completed_ids)} boardgames with all ratings already pulled to completion"
         )
         boardgame_ids = list(set(boardgame_ids).difference(set(completed_ids)))
+        # reorder boardgame_ids to match boardgame_data_ratings
+        boardgame_ids = boardgame_data_ratings.loc[boardgame_data_ratings["id"].isin(boardgame_ids), "id"].tolist()
         df_missing_ratings = boardgame_data_ratings.loc[
             (boardgame_data_ratings["ratings_pulled"] - boardgame_data_ratings["numratings"])
             / (boardgame_data_ratings["numratings"])
