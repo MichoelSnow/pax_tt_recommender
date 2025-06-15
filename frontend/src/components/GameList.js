@@ -385,9 +385,10 @@ const GameList = () => {
                 ),
               }}
             />
-            <FormControl sx={{ minWidth: 200 }}>
-              <InputLabel>Sort By Rank</InputLabel>
+            <FormControl sx={{ minWidth: 200, mt: 1 }}>
+              <InputLabel id="sort-by-label">Sort By Rank</InputLabel>
               <Select
+                labelId="sort-by-label"
                 value={sortBy}
                 label="Sort By Rank"
                 onChange={(e) => setSortBy(e.target.value)}

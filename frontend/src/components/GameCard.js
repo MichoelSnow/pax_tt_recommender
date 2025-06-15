@@ -61,8 +61,8 @@ const GameCard = memo(({ game, onClick, sortBy }) => {
       <CardMedia
         component="img"
         sx={{ 
-          width: 140,
-          height: 200,
+          width: 120,
+          height: 160,
           objectFit: 'contain',
           backgroundColor: bgColor,
           transition: 'background-color 0.3s ease',
@@ -80,7 +80,7 @@ const GameCard = memo(({ game, onClick, sortBy }) => {
         display: 'flex', 
         flexDirection: 'column',
         minWidth: 0,
-        maxWidth: 'calc(100% - 140px)'  // Account for image width
+        maxWidth: 'calc(100% - 120px)'  // Account for image width
       }}>
         <Typography 
           variant="h4" 
@@ -116,12 +116,12 @@ const GameCard = memo(({ game, onClick, sortBy }) => {
               {game.average_weight ? `${game.average_weight.toFixed(1)}/5` : 'N/A'}
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {/* <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <EmojiEventsIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
             <Typography variant="body2" color="text.secondary">
               {game[sortBy] || 'Unranked'}
             </Typography>
-          </Box>
+          </Box> */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <StarBorderOutlinedIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
             <Typography variant="body2" color="text.secondary">
