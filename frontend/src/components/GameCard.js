@@ -70,7 +70,13 @@ const GameCard = memo(({ game, onClick, sortBy }) => {
         crossOrigin="anonymous"
         onLoad={handleImageLoad}
       />
-      <CardContent sx={{ flexGrow: 1, p: 1, display: 'flex', flexDirection: 'column' }}>
+      <CardContent sx={{ 
+        flexGrow: 1, 
+        p: 1, 
+        display: 'flex', 
+        flexDirection: 'column',
+        minWidth: 0  // This is crucial for text overflow to work
+      }}>
         <Typography 
           variant="h4" 
           sx={{ 
@@ -80,7 +86,8 @@ const GameCard = memo(({ game, onClick, sortBy }) => {
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             width: '100%',
-            display: 'block'
+            display: 'block',
+            minWidth: 0  // This is crucial for text overflow to work
           }}
         >
           {game.name}
