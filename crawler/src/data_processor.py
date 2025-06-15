@@ -11,6 +11,7 @@ from typing import Dict, List, Any
 import logging
 import time
 import csv
+import argparse
 
 # Configure logging
 logging.basicConfig(
@@ -312,7 +313,7 @@ def save_language_dependence(
 
 
 def combine_crawler_data(
-    ranks_file: str, data_file: str, output_file_base: str, timestamp: int
+    ranks_file: str, data_file: str, output_file_base: str, timestamp: int, exclude_ids: List[int] = None
 ) -> None:
     """
     Combine board game rankings and detailed data into a format for backend import.
@@ -322,6 +323,7 @@ def combine_crawler_data(
         data_file (str): Path to the board game data parquet file
         output_file_base (str): Base path to save the combined data
         timestamp (int): Unix timestamp for the output file
+        exclude_ids (List[int]): List of game IDs to exclude from the data
     """
     logger.info("Starting data combination process")
 
@@ -342,6 +344,10 @@ def combine_crawler_data(
     # Merge rankings data with game data
     df_merged = pd.merge(df_data, df_ranks, on="id", how="inner")
 
+    # Filter out excluded games
+    if exclude_ids:
+        df_merged = df_merged[~df_merged["id"].isin(exclude_ids)]
+
     # Save the basic info
     save_basic_info(df_merged, output_file_base, timestamp)
 
@@ -360,6 +366,12 @@ def combine_crawler_data(
 
 def main():
     """Main function to process the most recent crawler outputs."""
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description='Process board game data from crawler outputs.')
+    parser.add_argument('--exclude-expansions', action='store_true',
+                      help='Exclude board game expansions from the output')
+    args = parser.parse_args()
+
     # Get the data directory using the project root
     data_dir = PROJECT_ROOT / "data" / "crawler"
     save_dir = PROJECT_ROOT / "data" / "processed"
@@ -380,12 +392,21 @@ def main():
     timestamp = int(time.time())
     output_file_base = save_dir / "processed_games"
 
+    # Read the ranks file to check for expansions if needed
+    if args.exclude_expansions:
+        df_ranks = pd.read_csv(latest_ranks, sep="|", escapechar="\\")
+        expansion_ids = df_ranks[df_ranks['is_expansion'] == 1]['id'].tolist()
+        logger.info(f"Found {len(expansion_ids)} expansion games")
+    else:
+        expansion_ids = None
+
     # Process the data
     combine_crawler_data(
         ranks_file=str(latest_ranks),
         data_file=str(latest_data),
         output_file_base=str(output_file_base),
         timestamp=timestamp,
+        exclude_ids=expansion_ids
     )
 
 
