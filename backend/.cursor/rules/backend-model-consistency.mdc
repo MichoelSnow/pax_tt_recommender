@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Whenever you make changes to any backend models or tables check all other files in the backend for references to those models or tables and ensure that the appropriate changes are made there as well. 
