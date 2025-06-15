@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple
 import argparse
 import logging
 from pathlib import Path
-
+import json
 
 # Configure logging
 logging.basicConfig(
@@ -32,7 +32,7 @@ class GameRecommender:
         self.game_mapping = {}  # Maps game IDs to indices
         self.reverse_game_mapping = {}  # Maps indices back to game IDs
         self.rating_matrix = None
-        self.item_embeddings = None
+        self.game_embeddings = None
         self.valid_game_ids = (
             None  # Set of valid game IDs (non-expansions if exclude_expansions is True)
         )
@@ -47,11 +47,13 @@ class GameRecommender:
         Returns:
             sparse.csr_matrix: Sparse matrix of user-game ratings
         """
+        # check if the dataframe has a column called "id"
+        if "id" in df.columns:
+            df = df.set_index("id")
+
         # Create mappings for users and games
         all_users = set()
         for col in df.columns:
-            if col == "id":  # Skip the id column
-                continue
             # Handle both list and non-list values in the ratings
             for users in df[col].dropna():
                 if isinstance(users, list):
@@ -78,9 +80,6 @@ class GameRecommender:
         for game_id, row in df.iterrows():
             game_idx = self.game_mapping[game_id]
             for rating, users in row.items():
-                if rating == "id":  # Skip the id column
-                    continue
-
                 # Skip if users is NaN
                 if users is None:
                     continue
@@ -147,59 +146,128 @@ class GameRecommender:
         self.rating_matrix = self._filter_users(self.rating_matrix)
 
         # Compute game similarity matrix
-        self.item_embeddings = normalize(self.rating_matrix.T, norm="l2", axis=1)
+        self.game_embeddings = normalize(self.rating_matrix.T, norm="l2", axis=1)
 
-    def recommend_similar_games(
-        self,
-        game_ids: List[str],
-        disliked_games: List[str] = None,
-        n_recommendations: int = 5,
-        anti_weight: float = 1.0,
-    ) -> List[Tuple[str, float]]:
-        """
-        Generate recommendations using vector arithmetic on item embeddings.
-        """
-        from sklearn.preprocessing import normalize
+    # def recommend_similar_games(
+    #     self,
+    #     game_ids: List[str],
+    #     disliked_games: List[str] = None,
+    #     n_recommendations: int = 5,
+    #     anti_weight: float = 1.0,
+    # ) -> List[Tuple[str, float]]:
+    #     """
+    #     Generate recommendations using vector arithmetic on item embeddings.
+    #     """
+    #     from sklearn.preprocessing import normalize
 
-        # Convert liked/disliked game IDs to indices
-        liked_indices = [
-            self.game_mapping[g] for g in game_ids if g in self.game_mapping
-        ]
-        disliked_indices = [
-            self.game_mapping[g] for g in disliked_games or [] if g in self.game_mapping
-        ]
+    #     # Convert liked/disliked game IDs to indices
+    #     liked_indices = [
+    #         self.game_mapping[g] for g in game_ids if g in self.game_mapping
+    #     ]
+    #     disliked_indices = [
+    #         self.game_mapping[g] for g in disliked_games or [] if g in self.game_mapping
+    #     ]
 
-        if not liked_indices:
-            return []
+    #     if not liked_indices:
+    #         return []
 
-        # Get mean embedding vector
-        pos_vec = self.item_embeddings[liked_indices].mean(axis=0)
-        neg_vec = (
-            self.item_embeddings[disliked_indices].mean(axis=0)
-            if disliked_indices
-            else 0
+    #     # Get mean embedding vector
+    #     pos_vec = self.game_embeddings[liked_indices].mean(axis=0)
+    #     neg_vec = (
+    #         self.game_embeddings[disliked_indices].mean(axis=0)
+    #         if disliked_indices
+    #         else 0
+    #     )
+    #     query_vec = pos_vec - anti_weight * neg_vec
+    #     query_vec = normalize(query_vec, norm="l2")
+
+    #     # Compute scores using sparse dot product
+    #     scores = self.game_embeddings @ query_vec.T
+    #     scores = np.array(scores.todense()).ravel()  # convert sparse to 1D dense array
+
+    #     # Filter out input games
+    #     for idx in liked_indices + disliked_indices:
+    #         scores[idx] = -1
+
+    #     # Exclude expansions if configured
+    #     if self.exclude_expansions and self.valid_game_ids:
+    #         for idx, game_id in self.reverse_game_mapping.items():
+    #             if game_id not in self.valid_game_ids:
+    #                 scores[idx] = -1
+
+    #     # Return top N scores
+    #     top_indices = np.argsort(scores)[-n_recommendations:][::-1]
+    #     return [
+    #         (self.reverse_game_mapping[idx], scores[idx])
+    #         for idx in top_indices
+    #         if scores[idx] > 0
+    #     ]
+
+
+def main():
+    """Main function to train and save the recommender model."""
+    try:
+        parser = argparse.ArgumentParser(
+            description="Train and save a the embeddings for a game recommender model"
         )
-        query_vec = pos_vec - anti_weight * neg_vec
-        query_vec = normalize(query_vec, norm="l2")
+        parser.add_argument(
+            "--min-ratings",
+            type=int,
+            default=3,
+            help="Minimum number of ratings per user (default: 3)",
+        )
+        parser.add_argument(
+            "--exclude-expansions",
+            action="store_true",
+            help="Exclude expansions from recommendations",
+        )
+        args = parser.parse_args()
 
-        # Compute scores using sparse dot product
-        scores = self.item_embeddings @ query_vec.T
-        scores = np.array(scores.todense()).ravel()  # convert sparse to 1D dense array
+        # Find the most recent ratings file
+        data_dir = Path(__file__).parent.parent.parent / "data" / "crawler"
+        ratings_files = list(data_dir.glob("boardgame_ratings_*.parquet"))
+        if not ratings_files:
+            raise FileNotFoundError("No ratings files found")
 
-        # Filter out input games
-        for idx in liked_indices + disliked_indices:
-            scores[idx] = -1
+        latest_ratings = max(ratings_files, key=lambda x: x.stat().st_mtime)
+        logger.info(f"Using ratings file: {latest_ratings}")
 
-        # Exclude expansions if configured
-        if self.exclude_expansions and self.valid_game_ids:
-            for idx, game_id in self.reverse_game_mapping.items():
-                if game_id not in self.valid_game_ids:
-                    scores[idx] = -1
+        # Read ratings data
+        df_ratings = pd.read_parquet(latest_ratings)
 
-        # Return top N scores
-        top_indices = np.argsort(scores)[-n_recommendations:][::-1]
-        return [
-            (self.reverse_game_mapping[idx], scores[idx])
-            for idx in top_indices
-            if scores[idx] > 0
-        ]
+        # Initialize and train the recommender
+        recommender = GameRecommender(
+            min_ratings_per_user=args.min_ratings,
+            exclude_expansions=args.exclude_expansions,
+        )
+
+        # Load valid games if excluding expansions
+        if args.exclude_expansions:
+            recommender.valid_game_ids = recommender._load_valid_games()
+
+        recommender.fit(df_ratings)
+
+        # Get timestamp from ratings file
+        timestamp = latest_ratings.stem.split("_")[-1]
+
+        # Save game embeddings as npz
+        embeddings_path = data_dir / f"game_embeddings_{timestamp}.npz"
+        sparse.save_npz(
+            file=embeddings_path,
+            matrix=recommender.game_embeddings,
+        )
+        logger.info(f"Successfully saved embeddings to {embeddings_path}")
+
+        # save reverse mappings as JSON
+        reverse_mappings_path = data_dir / f"reverse_mappings_{timestamp}.json"
+        with open(reverse_mappings_path, "w") as f:
+            json.dump(recommender.reverse_game_mapping, f)
+        logger.info(f"Successfully saved reverse mappings to {reverse_mappings_path}")
+
+    except Exception as e:
+        logger.error(f"Error training recommender model: {str(e)}")
+        raise
+
+
+if __name__ == "__main__":
+    main()
