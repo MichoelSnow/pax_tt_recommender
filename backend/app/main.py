@@ -119,9 +119,42 @@ async def get_game(game_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Error fetching game")
 
 @app.get("/recommendations/{game_id}", response_model=List[schemas.BoardGameOut])
-async def get_recommendations(game_id: int, limit: int = 10):
+async def get_recommendations(
+    game_id: int,
+    db: Session = Depends(get_db),
+    limit: int = 10,
+    disliked_games: Optional[str] = None,
+    anti_weight: float = 1.0
+):
+    """
+    Get game recommendations based on a game ID.
+    
+    Args:
+        game_id: ID of the game to get recommendations for
+        db: Database session
+        limit: Maximum number of recommendations to return
+        disliked_games: Comma-separated list of game IDs to use as anti-recommendations
+        anti_weight: Weight to apply to anti-recommendations (higher values = stronger anti-recommendations)
+    """
     try:
-        recommendations = crud.get_recommendations(game_id, limit)
+        # Parse disliked games if provided
+        disliked_games_list = None
+        if disliked_games:
+            try:
+                disliked_games_list = [int(gid) for gid in disliked_games.split(',')]
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid disliked_games format. Expected comma-separated list of game IDs."
+                )
+        
+        recommendations = crud.get_recommendations(
+            game_id=game_id,
+            db=db,
+            limit=limit,
+            disliked_games=disliked_games_list,
+            anti_weight=anti_weight
+        )
         return recommendations
     except Exception as e:
         logger.error(f"Error getting recommendations for game {game_id}: {str(e)}", exc_info=True)

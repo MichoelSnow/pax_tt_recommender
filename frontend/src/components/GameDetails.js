@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -11,7 +11,9 @@ import {
   Chip,
   Divider,
   Paper,
+  CircularProgress,
 } from '@mui/material';
+import axios from 'axios';
 
 // Helper function to decode HTML entities and preserve line breaks
 const decodeHtmlEntities = (text) => {
@@ -27,6 +29,28 @@ const decodeHtmlEntities = (text) => {
 };
 
 const GameDetails = ({ game, open, onClose, onFilter }) => {
+  const [recommendations, setRecommendations] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      if (!game) return;
+      setLoading(true);
+      try {
+        const response = await axios.get(`http://localhost:8000/recommendations/${game.id}`);
+        setRecommendations(response.data);
+      } catch (err) {
+        console.error('Failed to fetch recommendations:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (open && game) {
+      fetchRecommendations();
+    }
+  }, [game, open]);
+
   if (!game) return null;
 
   const renderList = (items, label, type) => {
@@ -66,6 +90,53 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
             );
           })}
         </Box>
+      </Box>
+    );
+  };
+
+  const renderRecommendations = () => {
+    if (loading) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+          <CircularProgress />
+        </Box>
+      );
+    }
+
+    if (!recommendations || recommendations.length === 0) {
+      return (
+        <Typography variant="body2" color="text.secondary">
+          No recommendations available.
+        </Typography>
+      );
+    }
+
+    return (
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+        {recommendations.map((rec) => (
+          <Chip
+            key={rec.id}
+            label={rec.name}
+            size="small"
+            onClick={() => {
+              onClose();
+              // Fetch and show the recommended game's details
+              axios.get(`http://localhost:8000/games/${rec.id}`)
+                .then(response => {
+                  onFilter('game', rec.id, rec.name);
+                })
+                .catch(err => {
+                  console.error('Failed to fetch recommended game:', err);
+                });
+            }}
+            sx={{
+              cursor: 'pointer',
+              '&:hover': {
+                backgroundColor: 'action.hover'
+              }
+            }}
+          />
+        ))}
       </Box>
     );
   };
@@ -120,6 +191,13 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
             >
               {decodeHtmlEntities(game.description)}
             </Typography>
+          </Grid>
+          <Grid item xs={12}>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle1" gutterBottom>
+              Similar Games
+            </Typography>
+            {renderRecommendations()}
           </Grid>
         </Grid>
       </DialogContent>
