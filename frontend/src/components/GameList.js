@@ -349,25 +349,29 @@ const GameList = () => {
     }
 
     return (
-      <Grid container spacing={3}>
-        {games.map((game) => (
-          <Grid item xs={12} sm={6} md={4} key={game.id}>
-            <GameCard
-              game={game}
-              onClick={() => handleGameClick(game)}
-              sortBy={sortBy}
-            />
-          </Grid>
-        ))}
-      </Grid>
+      <Box sx={{ width: '100%', overflow: 'hidden' }}>
+        <Grid container spacing={3} sx={{ width: '100%', margin: 0 }}>
+          {games.map((game) => (
+            <Grid item xs={12} sm={6} md={4} key={game.id} sx={{ width: '100%', padding: '12px !important' }}>
+              <Box sx={{ width: '100%', height: '100%' }}>
+                <GameCard
+                  game={game}
+                  onClick={() => handleGameClick(game)}
+                  sortBy={sortBy}
+                />
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+      </Box>
     );
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ my: 4, display: 'flex', gap: 4 }}>
-        <Box sx={{ flex: 1 }}>
-          <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
+    <Container maxWidth="xl" sx={{ py: 4, width: '100%', overflow: 'hidden' }}>
+      <Box sx={{ my: 4, display: 'flex', gap: 4, width: '100%', overflow: 'hidden' }}>
+        <Box sx={{ flex: 1, width: '100%', overflow: 'hidden' }}>
+          <Box sx={{ display: 'flex', gap: 2, mb: 4, width: '100%' }}>
             <TextField
               fullWidth
               variant="outlined"
@@ -397,7 +401,9 @@ const GameList = () => {
             </FormControl>
           </Box>
           {renderFilterChips()}
-          {renderGameGrid()}
+          <Box sx={{ width: '100%', overflow: 'hidden' }}>
+            {renderGameGrid()}
+          </Box>
         </Box>
         <Box sx={{ width: 300 }}>
           <FormControl fullWidth sx={{ mb: 2 }}>

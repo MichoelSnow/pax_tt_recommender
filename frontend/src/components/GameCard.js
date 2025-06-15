@@ -47,6 +47,8 @@ const GameCard = memo(({ game, onClick, sortBy }) => {
     <Card 
       sx={{ 
         height: '100%',
+        width: '100%',
+        maxWidth: '100%',
         display: 'flex',
         flexDirection: 'row',
         cursor: 'pointer',
@@ -60,9 +62,11 @@ const GameCard = memo(({ game, onClick, sortBy }) => {
         component="img"
         sx={{ 
           width: 140,
+          height: 200,
           objectFit: 'contain',
           backgroundColor: bgColor,
-          transition: 'background-color 0.3s ease'
+          transition: 'background-color 0.3s ease',
+          flexShrink: 0
         }}
         image={game.image ? `http://localhost:8000/proxy-image/${encodeURIComponent(game.image)}` : '/placeholder.png'}
         alt={game.name}
@@ -75,7 +79,8 @@ const GameCard = memo(({ game, onClick, sortBy }) => {
         p: 1, 
         display: 'flex', 
         flexDirection: 'column',
-        minWidth: 0  // This is crucial for text overflow to work
+        minWidth: 0,
+        maxWidth: 'calc(100% - 140px)'  // Account for image width
       }}>
         <Typography 
           variant="h4" 
