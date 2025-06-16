@@ -14,6 +14,19 @@ import StarBorderOutlinedIcon from '@mui/icons-material/StarBorderOutlined';
 
 const GameCard = memo(({ game, onClick, sortBy }) => {
   const [bgColor, setBgColor] = useState('#f5f5f5');
+  const [imageSrc, setImageSrc] = useState(() => {
+    if (!game.image) return '/placeholder.png';
+    const filename = game.image.split('/').pop();
+    return `http://localhost:8000/images/${filename}`;
+  });
+
+  const handleImageError = () => {
+    if (game.image) {
+      setImageSrc(`http://localhost:8000/proxy-image/${encodeURIComponent(game.image)}`);
+    } else {
+      setImageSrc('/placeholder.png');
+    }
+  };
 
   const handleImageLoad = (event) => {
     const img = event.target;
@@ -68,11 +81,12 @@ const GameCard = memo(({ game, onClick, sortBy }) => {
           transition: 'background-color 0.3s ease',
           flexShrink: 0
         }}
-        image={game.image ? `http://localhost:8000/proxy-image/${encodeURIComponent(game.image)}` : '/placeholder.png'}
+        image={imageSrc}
         alt={game.name}
         loading="lazy"
         crossOrigin="anonymous"
         onLoad={handleImageLoad}
+        onError={handleImageError}
       />
       <CardContent sx={{ 
         flexGrow: 1, 

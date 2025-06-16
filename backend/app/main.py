@@ -1,11 +1,13 @@
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from typing import List, Optional
 import logging
 import httpx
 from sqlalchemy.orm import Session
+from pathlib import Path
 from . import crud, models, schemas
 from .database import engine, SessionLocal
 
@@ -18,6 +20,10 @@ logger = logging.getLogger(__name__)
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
+
+# Get the project root directory
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+IMAGES_DIR = PROJECT_ROOT / "backend" / "database" / "images"
 
 app = FastAPI(
     title="Board Game Recommender API",
@@ -33,6 +39,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount the images directory
+app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
 
 # Dependency to get database session
 def get_db():

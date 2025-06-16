@@ -17,7 +17,13 @@ build/
 
 # SQLite database
 *.db
-backend/database/
+backend/database/*.db
+backend/database/*.csv
+backend/database/*.npz
+backend/database/*.json
+backend/database/images/*.jpg
+backend/database/images/*.png
+
 
 # Logs
 *.log
