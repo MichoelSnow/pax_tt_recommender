@@ -329,7 +329,7 @@ def combine_crawler_data(
 
     # Read the data files
     try:
-        df_ranks = pd.read_csv(ranks_file, sep="|", escapechar="\\")
+        df_ranks = pd.read_csv(ranks_file, sep="|", escapechar="\\", quoting=csv.QUOTE_NONE)
         df_data = pd.read_parquet(data_file)
         logger.info(
             f"Successfully loaded {len(df_ranks)} rankings and {len(df_data)} detailed records"
@@ -394,7 +394,7 @@ def main():
 
     # Read the ranks file to check for expansions if needed
     if args.exclude_expansions:
-        df_ranks = pd.read_csv(latest_ranks, sep="|", escapechar="\\")
+        df_ranks = pd.read_csv(latest_ranks, sep="|", escapechar="\\", quoting=csv.QUOTE_NONE)
         expansion_ids = df_ranks[df_ranks['is_expansion'] == 1]['id'].tolist()
         logger.info(f"Found {len(expansion_ids)} expansion games")
     else:

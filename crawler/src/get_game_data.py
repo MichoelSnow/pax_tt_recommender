@@ -24,6 +24,7 @@ import json
 import argparse
 import bs4
 import html
+import csv
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -412,7 +413,7 @@ def main():
         logger.info(f"Using rankings file: {latest_ranks}")
 
         # Read rankings
-        df_ranks = pd.read_csv(latest_ranks, sep="|", escapechar="\\")
+        df_ranks = pd.read_csv(latest_ranks, sep="|", escapechar="\\", quoting=csv.QUOTE_NONE)  
 
         # Get existing game data if continuing
         existing_data = None

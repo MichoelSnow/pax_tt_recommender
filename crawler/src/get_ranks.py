@@ -117,6 +117,7 @@ def get_boardgame_ranks(cookies: dict, save_file: bool = False):
     with ZipFile(BytesIO(bg_ranks_zip.content)) as archive:
         with archive.open("boardgames_ranks.csv") as csv:
             df_bg_ranks = pd.read_csv(csv)
+            df_bg_ranks = df_bg_ranks["name"].str.replace("[“”]", '"', regex=True)
             df_bg_ranks["queried_at_utc"] = queried_at_utc
             logger.info(f"Successfully loaded {len(df_bg_ranks)} boardgames")
             if save_file:
