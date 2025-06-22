@@ -2,11 +2,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.pool import QueuePool
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Database URL
-SQLALCHEMY_DATABASE_URL = "sqlite:///backend/database/boardgames.db"
+# Get the backend directory path
+backend_dir = Path(__file__).parent.parent
+database_path = backend_dir / "database" / "boardgames.db"
+
+# Database URL - use absolute path
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{database_path}"
 
 # Create engine with optimized settings
 engine = create_engine(

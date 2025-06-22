@@ -193,3 +193,20 @@ class Version(Base):
     language = Column(String)
     version_nickname = Column(String)
     game = relationship("BoardGame", back_populates="versions")
+
+class PAXGame(Base):
+    __tablename__ = 'pax_games'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    name_raw = Column(String)
+    bgg_id = Column(Integer, ForeignKey('games.id'), nullable=True)  # Links to BoardGame if exists
+    publisher = Column(String)
+    min_titles_id = Column(Integer)
+    titles_id_list = Column(String)  # Comma-separated list of title IDs
+    convention_name = Column(String)
+    convention_year = Column(Integer)
+    year_title_first_added = Column(Integer)
+    
+    # Relationship to BoardGame if bgg_id exists
+    board_game = relationship("BoardGame", foreign_keys=[bgg_id])

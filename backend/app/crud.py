@@ -241,3 +241,77 @@ def get_recommendations(
         disliked_games=disliked_games,
         anti_weight=anti_weight
     )
+
+# PAX Games CRUD operations
+def get_pax_games(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    convention_name: Optional[str] = None,
+    convention_year: Optional[int] = None,
+    has_bgg_id: Optional[bool] = None
+):
+    """Get PAX games with optional filtering."""
+    query = db.query(models.PAXGame)
+    
+    if convention_name:
+        query = query.filter(models.PAXGame.convention_name == convention_name)
+    
+    if convention_year:
+        query = query.filter(models.PAXGame.convention_year == convention_year)
+    
+    if has_bgg_id is not None:
+        if has_bgg_id:
+            query = query.filter(models.PAXGame.bgg_id.isnot(None))
+        else:
+            query = query.filter(models.PAXGame.bgg_id.is_(None))
+    
+    # Get total count before pagination
+    total = query.count()
+    
+    # Apply pagination
+    pax_games = query.offset(skip).limit(limit).all()
+    
+    return pax_games, total
+
+
+def get_pax_game(db: Session, pax_game_id: int):
+    """Get a specific PAX game by ID."""
+    return db.query(models.PAXGame).filter(models.PAXGame.id == pax_game_id).first()
+
+
+def get_pax_game_by_bgg_id(db: Session, bgg_id: int):
+    """Get PAX game by BGG ID."""
+    return db.query(models.PAXGame).filter(models.PAXGame.bgg_id == bgg_id).first()
+
+
+def create_pax_game(db: Session, pax_game: schemas.PAXGameCreate):
+    """Create a new PAX game."""
+    db_pax_game = models.PAXGame(**pax_game.model_dump())
+    db.add(db_pax_game)
+    db.commit()
+    db.refresh(db_pax_game)
+    return db_pax_game
+
+
+def get_pax_games_by_convention(db: Session, convention_name: str, convention_year: Optional[int] = None):
+    """Get PAX games for a specific convention."""
+    query = db.query(models.PAXGame).filter(models.PAXGame.convention_name == convention_name)
+    
+    if convention_year:
+        query = query.filter(models.PAXGame.convention_year == convention_year)
+    
+    return query.all()
+
+
+def get_pax_games_with_board_game_links(db: Session, skip: int = 0, limit: int = 100):
+    """Get PAX games that have links to BoardGame records."""
+    query = db.query(models.PAXGame).filter(models.PAXGame.bgg_id.isnot(None))
+    
+    # Get total count before pagination
+    total = query.count()
+    
+    # Apply pagination
+    pax_games = query.offset(skip).limit(limit).all()
+    
+    return pax_games, total

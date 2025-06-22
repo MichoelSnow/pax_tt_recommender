@@ -197,3 +197,28 @@ class GameListResponse(BaseModel):
     total: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PAXGameBase(BaseModel):
+    name: str
+    name_raw: Optional[str] = None
+    bgg_id: Optional[int] = None
+    publisher: Optional[str] = None
+    min_titles_id: Optional[int] = None
+    titles_id_list: Optional[str] = None
+    convention_name: Optional[str] = None
+    convention_year: Optional[int] = None
+    year_title_first_added: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PAXGameCreate(PAXGameBase):
+    pass
+
+
+class PAXGameOut(PAXGameBase):
+    id: int
+    board_game: Optional[BoardGameOut] = None
+
+    model_config = ConfigDict(from_attributes=True)

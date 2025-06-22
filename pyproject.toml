@@ -29,6 +29,7 @@ uvicorn = "^0.34.3"
 alembic = "^1.16.1"
 httpx = "^0.28.1"
 tqdm = "^4.67.1"
+rapidfuzz = "^3.13.0"
 
 
 [build-system]
