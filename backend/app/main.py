@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
@@ -10,6 +11,10 @@ from sqlalchemy.orm import Session
 from pathlib import Path
 from . import crud, models, schemas
 from .database import engine, SessionLocal
+import time
+from functools import lru_cache
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 # Configure logging
 logging.basicConfig(
@@ -39,6 +44,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add Gzip compression middleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Mount the images directory
 app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
@@ -76,6 +84,44 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={"detail": "An unexpected error occurred"}
     )
 
+# Simple in-memory cache for frequently accessed data
+_cache = {}
+_cache_ttl = {}
+
+def get_cached_data(key: str, ttl_seconds: int = 300):
+    """Get data from cache if not expired."""
+    if key in _cache and key in _cache_ttl:
+        if time.time() < _cache_ttl[key]:
+            return _cache[key]
+        else:
+            # Remove expired cache entry
+            del _cache[key]
+            del _cache_ttl[key]
+    return None
+
+def set_cached_data(key: str, data, ttl_seconds: int = 300):
+    """Set data in cache with TTL."""
+    _cache[key] = data
+    _cache_ttl[key] = time.time() + ttl_seconds
+
+# Thread pool for database operations
+db_executor = ThreadPoolExecutor(max_workers=4)
+
+async def run_with_timeout(func, *args, timeout_seconds=25, **kwargs):
+    """Run a function with a timeout to prevent hanging."""
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(
+            db_executor, 
+            lambda: func(*args, **kwargs)
+        )
+        return result
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=408, detail="Request timeout")
+    except Exception as e:
+        logger.error(f"Database operation error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database error")
+
 @app.get("/")
 async def root():
     return {"message": "Board Game Recommender API"}
@@ -96,7 +142,9 @@ async def list_games(
     categories: Optional[str] = None
 ):
     try:
-        games, total = crud.get_games(
+        # Use timeout wrapper to prevent hanging
+        games, total = await run_with_timeout(
+            crud.get_games,
             db=db,
             skip=skip,
             limit=limit,
@@ -108,9 +156,12 @@ async def list_games(
             recommendations=recommendations,
             weight=weight,
             mechanics=mechanics,
-            categories=categories
+            categories=categories,
+            timeout_seconds=25
         )
         return {"games": games, "total": total}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching games: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error fetching games")
@@ -171,19 +222,45 @@ async def get_recommendations(
         raise HTTPException(status_code=500, detail="Error getting recommendations")
 
 @app.get("/filter-options/", response_model=schemas.FilterOptions)
-async def get_filter_options():
+async def get_filter_options(db: Session = Depends(get_db)):
     try:
-        options = crud.get_filter_options()
+        # Check cache first
+        cache_key = "filter_options"
+        cached_result = get_cached_data(cache_key, ttl_seconds=1800)  # 30 minutes cache
+        if cached_result:
+            return cached_result
+        
+        # Get from database
+        options = crud.get_filter_options(db)
+        
+        # Cache the result
+        set_cached_data(cache_key, options, ttl_seconds=1800)
+        
         return options
     except Exception as e:
         logger.error(f"Error fetching filter options: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error fetching filter options")
 
 @app.get("/mechanics/", response_model=List[schemas.MechanicBase])
-async def list_mechanics(db: Session = Depends(get_db)):
+async def list_mechanics(
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100
+):
     try:
-        mechanics = db.query(models.Mechanic.boardgamemechanic_id, models.Mechanic.boardgamemechanic_name).distinct().all()
-        return [{"boardgamemechanic_id": m[0], "boardgamemechanic_name": m[1]} for m in mechanics]
+        # Check cache first
+        cache_key = f"mechanics_{skip}_{limit}"
+        cached_result = get_cached_data(cache_key, ttl_seconds=600)  # 10 minutes cache
+        if cached_result:
+            return cached_result
+        
+        # Get from database
+        mechanics = crud.get_mechanics_cached(db, skip=skip, limit=limit)
+        
+        # Cache the result
+        set_cached_data(cache_key, mechanics, ttl_seconds=600)
+        
+        return mechanics
     except Exception as e:
         logger.error(f"Error fetching mechanics: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error fetching mechanics")

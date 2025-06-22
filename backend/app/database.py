@@ -16,7 +16,10 @@ SQLALCHEMY_DATABASE_URL = f"sqlite:///{database_path}"
 # Create engine with optimized settings
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},  # Needed for SQLite
+    connect_args={
+        "check_same_thread": False,  # Needed for SQLite
+        "timeout": 30.0  # 30 second timeout to prevent hanging
+    },
     poolclass=QueuePool,
     pool_size=5,
     max_overflow=10,

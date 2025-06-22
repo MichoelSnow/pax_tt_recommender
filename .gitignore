@@ -24,10 +24,11 @@ backend/database/*.json
 backend/database/images/*.jpg
 backend/database/images/*.png
 
-
 # Logs
 *.log
 import.log
+backend/logs/*.log
+crawler/logs/*.log
 
 # Jupyter Notebooks
 .ipynb_checkpoints/

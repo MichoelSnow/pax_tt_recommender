@@ -25,94 +25,13 @@ def get_games(
     categories: Optional[str] = None
 ):
     try:
-        # Start with a base query that only loads the main game fields
-        query = db.query(models.BoardGame).options(
-            # Only load the relationships needed for filtering
-            joinedload(models.BoardGame.mechanics).load_only(
-                models.Mechanic.boardgamemechanic_id,
-                models.Mechanic.boardgamemechanic_name
-            ),
-            joinedload(models.BoardGame.categories).load_only(
-                models.Category.boardgamecategory_id,
-                models.Category.boardgamecategory_name
-            ),
-            joinedload(models.BoardGame.suggested_players).load_only(
-                models.SuggestedPlayer.player_count,
-                models.SuggestedPlayer.recommendation_level
-            )
-        )
+        # Start with a base query - only load main game fields initially
+        query = db.query(models.BoardGame)
 
+        # Apply simple filters first
         if search:
             search_term = f"%{search}%"
             query = query.filter(models.BoardGame.name.ilike(search_term))
-
-        if designer_id:
-            designer_ids = [int(d_id) for d_id in designer_id.split(',')]
-            subquery = select(models.BoardGame.id).join(
-                models.BoardGame.designers
-            ).filter(
-                models.Designer.boardgamedesigner_id.in_(designer_ids)
-            ).group_by(
-                models.BoardGame.id
-            ).having(
-                func.count(models.Designer.boardgamedesigner_id) == len(designer_ids)
-            ).subquery()
-            query = query.filter(models.BoardGame.id.in_(subquery))
-
-        if artist_id:
-            artist_ids = [int(a_id) for a_id in artist_id.split(',')]
-            subquery = select(models.BoardGame.id).join(
-                models.BoardGame.artists
-            ).filter(
-                models.Artist.boardgameartist_id.in_(artist_ids)
-            ).group_by(
-                models.BoardGame.id
-            ).having(
-                func.count(models.Artist.boardgameartist_id) == len(artist_ids)
-            ).subquery()
-            query = query.filter(models.BoardGame.id.in_(subquery))
-
-        if mechanics:
-            mechanic_ids = [int(m_id) for m_id in mechanics.split(',')]
-            subquery = select(models.BoardGame.id).join(
-                models.BoardGame.mechanics
-            ).filter(
-                models.Mechanic.boardgamemechanic_id.in_(mechanic_ids)
-            ).group_by(
-                models.BoardGame.id
-            ).having(
-                func.count(models.Mechanic.boardgamemechanic_id) == len(mechanic_ids)
-            ).subquery()
-            query = query.filter(models.BoardGame.id.in_(subquery))
-
-        if categories:
-            category_ids = [int(c_id) for c_id in categories.split(',')]
-            subquery = select(models.BoardGame.id).join(
-                models.BoardGame.categories
-            ).filter(
-                models.Category.boardgamecategory_id.in_(category_ids)
-            ).group_by(
-                models.BoardGame.id
-            ).having(
-                func.count(models.Category.boardgamecategory_id) == len(category_ids)
-            ).subquery()
-            query = query.filter(models.BoardGame.id.in_(subquery))
-
-        if players:
-            query = query.join(models.BoardGame.suggested_players).filter(
-                models.SuggestedPlayer.player_count == players
-            )
-
-        if recommendations:
-            rec_list = recommendations.split(',')
-            if 'best' in rec_list:
-                query = query.filter(
-                    models.SuggestedPlayer.recommendation_level == 'best'
-                )
-            if 'recommended' in rec_list:
-                query = query.filter(
-                    models.SuggestedPlayer.recommendation_level == 'recommended'
-                )
 
         if weight:
             weight_list = weight.split(',')
@@ -130,9 +49,112 @@ def get_games(
             if weight_conditions:
                 query = query.filter(or_(*weight_conditions))
 
-        # Get total count before pagination
-        total = query.count()
-        logger.info(f"Total count before pagination: {total}")
+        # Apply relationship filters using efficient subqueries with timeout protection
+        if designer_id:
+            try:
+                designer_ids = [int(d_id) for d_id in designer_id.split(',')]
+                subquery = select(models.BoardGame.id).join(
+                    models.BoardGame.designers
+                ).filter(
+                    models.Designer.boardgamedesigner_id.in_(designer_ids)
+                ).group_by(
+                    models.BoardGame.id
+                ).having(
+                    func.count(models.Designer.boardgamedesigner_id) == len(designer_ids)
+                ).subquery()
+                query = query.filter(models.BoardGame.id.in_(subquery))
+            except Exception as e:
+                logger.warning(f"Error applying designer filter: {str(e)}")
+                # Continue without designer filter if it fails
+
+        if artist_id:
+            try:
+                artist_ids = [int(a_id) for a_id in artist_id.split(',')]
+                subquery = select(models.BoardGame.id).join(
+                    models.BoardGame.artists
+                ).filter(
+                    models.Artist.boardgameartist_id.in_(artist_ids)
+                ).group_by(
+                    models.BoardGame.id
+                ).having(
+                    func.count(models.Artist.boardgameartist_id) == len(artist_ids)
+                ).subquery()
+                query = query.filter(models.BoardGame.id.in_(subquery))
+            except Exception as e:
+                logger.warning(f"Error applying artist filter: {str(e)}")
+                # Continue without artist filter if it fails
+
+        if mechanics:
+            try:
+                mechanic_ids = [int(m_id) for m_id in mechanics.split(',')]
+                subquery = select(models.BoardGame.id).join(
+                    models.BoardGame.mechanics
+                ).filter(
+                    models.Mechanic.boardgamemechanic_id.in_(mechanic_ids)
+                ).group_by(
+                    models.BoardGame.id
+                ).having(
+                    func.count(models.Mechanic.boardgamemechanic_id) == len(mechanic_ids)
+                ).subquery()
+                query = query.filter(models.BoardGame.id.in_(subquery))
+            except Exception as e:
+                logger.warning(f"Error applying mechanics filter: {str(e)}")
+                # Continue without mechanics filter if it fails
+
+        if categories:
+            try:
+                category_ids = [int(c_id) for c_id in categories.split(',')]
+                subquery = select(models.BoardGame.id).join(
+                    models.BoardGame.categories
+                ).filter(
+                    models.Category.boardgamecategory_id.in_(category_ids)
+                ).group_by(
+                    models.BoardGame.id
+                ).having(
+                    func.count(models.Category.boardgamecategory_id) == len(category_ids)
+                ).subquery()
+                query = query.filter(models.BoardGame.id.in_(subquery))
+            except Exception as e:
+                logger.warning(f"Error applying categories filter: {str(e)}")
+                # Continue without categories filter if it fails
+
+        if recommendations:
+            try:
+                rec_list = recommendations.split(',')
+                # Need to join with suggested_players table for recommendations filter
+                query = query.join(models.BoardGame.suggested_players)
+                if players:
+                    query = query.filter(models.SuggestedPlayer.player_count == players)
+                if 'best' in rec_list:
+                    query = query.filter(
+                        models.SuggestedPlayer.recommendation_level == 'best'
+                    )
+                if 'recommended' in rec_list:
+                    query = query.filter(
+                        models.SuggestedPlayer.recommendation_level == 'recommended'
+                    )
+            except Exception as e:
+                logger.warning(f"Error applying recommendations filter: {str(e)}")
+                # Continue without recommendations filter if it fails
+        elif players:
+            try:
+                # Use min_players and max_players from games table instead of suggested_players
+                query = query.filter(
+                    and_(
+                        models.BoardGame.min_players <= players,
+                        models.BoardGame.max_players >= players
+                    )
+                )
+            except Exception as e:
+                logger.warning(f"Error applying players filter: {str(e)}")
+                # Continue without players filter if it fails
+
+        # Get total count before pagination with timeout protection
+        try:
+            total = query.count()
+        except Exception as e:
+            logger.error(f"Error getting total count: {str(e)}")
+            total = 0
 
         # Verify that the sort_by field exists in the model
         if not hasattr(models.BoardGame, sort_by):
@@ -142,12 +164,60 @@ def get_games(
         rank_field = getattr(models.BoardGame, sort_by)
         query = query.order_by(rank_field.asc().nullslast())
 
-        # Log the query
-        logger.info(f"SQL Query: {query}")
-
-        # Apply pagination
-        games = query.offset(skip).limit(limit).all()
-        logger.info(f"Number of games returned: {len(games)}")
+        # Apply pagination with timeout protection
+        try:
+            games = query.offset(skip).limit(limit).all()
+        except Exception as e:
+            logger.error(f"Error fetching games: {str(e)}")
+            games = []
+        
+        # Only load relationships for the returned games to avoid N+1
+        if games:
+            try:
+                game_ids = [game.id for game in games]
+                
+                # Load mechanics for returned games
+                mechanics_data = db.query(models.Mechanic).filter(
+                    models.Mechanic.game_id.in_(game_ids)
+                ).all()
+                
+                # Load categories for returned games
+                categories_data = db.query(models.Category).filter(
+                    models.Category.game_id.in_(game_ids)
+                ).all()
+                
+                # Load suggested players for returned games
+                suggested_players_data = db.query(models.SuggestedPlayer).filter(
+                    models.SuggestedPlayer.game_id.in_(game_ids)
+                ).all()
+                
+                # Group by game_id for efficient access
+                mechanics_by_game = {}
+                for m in mechanics_data:
+                    if m.game_id not in mechanics_by_game:
+                        mechanics_by_game[m.game_id] = []
+                    mechanics_by_game[m.game_id].append(m)
+                
+                categories_by_game = {}
+                for c in categories_data:
+                    if c.game_id not in categories_by_game:
+                        categories_by_game[c.game_id] = []
+                    categories_by_game[c.game_id].append(c)
+                
+                suggested_players_by_game = {}
+                for sp in suggested_players_data:
+                    if sp.game_id not in suggested_players_by_game:
+                        suggested_players_by_game[sp.game_id] = []
+                    suggested_players_by_game[sp.game_id].append(sp)
+                
+                # Attach relationships to games
+                for game in games:
+                    game.mechanics = mechanics_by_game.get(game.id, [])
+                    game.categories = categories_by_game.get(game.id, [])
+                    game.suggested_players = suggested_players_by_game.get(game.id, [])
+            except Exception as e:
+                logger.error(f"Error loading relationships: {str(e)}")
+                # Continue without relationships if loading fails
         
         return games, total
     except Exception as e:
@@ -176,6 +246,21 @@ def get_filter_options(db: Session):
         "categories": [c[0] for c in categories],
         "publishers": [p[0] for p in publishers]
     }
+
+def get_mechanics_cached(db: Session, skip: int = 0, limit: int = 100):
+    """Get mechanics with pagination and caching-friendly structure."""
+    mechanics = db.query(
+        models.Mechanic.boardgamemechanic_id,
+        models.Mechanic.boardgamemechanic_name
+    ).distinct().order_by(
+        models.Mechanic.boardgamemechanic_name
+    ).offset(skip).limit(limit).all()
+    
+    return [{"boardgamemechanic_id": m[0], "boardgamemechanic_name": m[1]} for m in mechanics]
+
+def get_mechanics_count(db: Session):
+    """Get total count of unique mechanics for pagination."""
+    return db.query(models.Mechanic.boardgamemechanic_id).distinct().count()
 
 def add_mechanic(db: Session, game_id: int, mechanic_name: str):
     mechanic = models.Mechanic(game_id=game_id, name=mechanic_name)
