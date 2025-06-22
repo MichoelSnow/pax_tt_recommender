@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import React, { useState, memo, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -16,20 +16,52 @@ import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
 import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
 
+const useProgressiveImage = (localSrc, remoteSrc, placeholder) => {
+    const [src, setSrc] = useState(placeholder);
+  
+    useEffect(() => {
+      if (!localSrc) {
+        setSrc(remoteSrc || placeholder);
+        return;
+      }
+  
+      const localImg = new Image();
+      localImg.src = localSrc;
+  
+      localImg.onload = () => {
+        setSrc(localSrc);
+      };
+  
+      localImg.onerror = () => {
+        if (remoteSrc) {
+            const remoteImg = new Image();
+            remoteImg.src = remoteSrc;
+            remoteImg.onload = () => {
+                setSrc(remoteSrc);
+            };
+            remoteImg.onerror = () => {
+                setSrc(placeholder);
+            }
+        } else {
+            setSrc(placeholder);
+        }
+      };
+    }, [localSrc, remoteSrc, placeholder]);
+  
+    return src;
+  };
+
 const GameCard = memo(({ game, onClick, sortBy, liked, disliked, onLike, onDislike }) => {
   const [bgColor, setBgColor] = useState('#f5f5f5');
-  const [imageSrc, setImageSrc] = useState(() => {
-    if (!game.image) return '/placeholder.png';
-    const filename = game.image.split('/').pop();
-    return `http://localhost:8000/images/${filename}`;
-  });
+  const localImage = game.image ? `http://localhost:8000/images/${game.image.split('/').pop()}` : null;
+  const remoteImage = game.image ? `http://localhost:8000/proxy-image/${encodeURIComponent(game.image)}` : null;
+  const placeholderImage = '/placeholder.png';
+
+  const imageSrc = useProgressiveImage(localImage, remoteImage, placeholderImage);
 
   const handleImageError = () => {
-    if (game.image) {
-      setImageSrc(`http://localhost:8000/proxy-image/${encodeURIComponent(game.image)}`);
-    } else {
-      setImageSrc('/placeholder.png');
-    }
+    // This function is now effectively a no-op as the hook handles the fallback.
+    // It's kept to avoid breaking the CardMedia prop, but could be removed.
   };
 
   const handleLikeClick = (e) => {
