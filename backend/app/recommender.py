@@ -63,6 +63,7 @@ def get_recommendations(
     liked_games: Optional[List[int]] = None,
     disliked_games: Optional[List[int]] = None,
     anti_weight: float = 1.0,
+    pax_only: Optional[bool] = False
 ) -> List[models.BoardGame]:
     """
     Get game recommendations using the game embeddings.
@@ -73,6 +74,7 @@ def get_recommendations(
         liked_games: Optional list of game IDs to use as positive recommendations
         disliked_games: Optional list of game IDs to use as anti-recommendations
         anti_weight: Weight to apply to anti-recommendations
+        pax_only: If true, only recommend games that are in the PAX games table
         
     Returns:
         List of recommended BoardGame objects
@@ -125,6 +127,12 @@ def get_recommendations(
 
         recommended_ids = [game[0] for game in recommended_games_with_scores]
         
+        if pax_only:
+            pax_game_ids = {pax.bgg_id for pax in db.query(models.PAXGame.bgg_id).filter(models.PAXGame.bgg_id.isnot(None)).all()}
+            recommended_ids = [rid for rid in recommended_ids if rid in pax_game_ids]
+            # Re-filter the scored list to match the id list
+            recommended_games_with_scores = [game for game in recommended_games_with_scores if game[0] in recommended_ids]
+
         # Get full game objects from database
         games_from_db = db.query(models.BoardGame).filter(
             models.BoardGame.id.in_(recommended_ids)

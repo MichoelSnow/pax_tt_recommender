@@ -29,6 +29,7 @@ import {
   InputAdornment,
   Stack,
   Popover,
+  Switch,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
@@ -126,6 +127,9 @@ const GameList = () => {
   const [gameList, setGameList] = useState([]);
   const [totalGames, setTotalGames] = useState(0);
   const [isRecommendation, setIsRecommendation] = useState(false);
+  const [allRecommendations, setAllRecommendations] = useState([]);
+  const [paxRecommendations, setPaxRecommendations] = useState([]);
+  const [paxOnly, setPaxOnly] = useState(false);
 
   const handleLikeGame = (game) => {
     setLikedGames(prev => {
@@ -157,13 +161,26 @@ const GameList = () => {
 
   const handleRecommend = async () => {
     try {
-      const response = await axios.post('http://localhost:8000/recommendations', {
+      const recommendationPayload = {
         liked_games: likedGames.map(g => g.id),
         disliked_games: dislikedGames.map(g => g.id),
-        limit: 50
-      });
-      setGameList(response.data);
-      setTotalGames(response.data.length);
+        limit: 100,
+      };
+
+      const [allResponse, paxResponse] = await Promise.all([
+        axios.post('http://localhost:8000/recommendations', {
+          ...recommendationPayload,
+          pax_only: false
+        }),
+        axios.post('http://localhost:8000/recommendations', {
+          ...recommendationPayload,
+          pax_only: true
+        })
+      ]);
+
+      setAllRecommendations(allResponse.data);
+      setPaxRecommendations(paxResponse.data);
+
       setCurrentPage(1);
       setIsRecommendation(true);
       setSortBy('recommendation_score');
@@ -190,6 +207,7 @@ const GameList = () => {
     setActiveFilter(null);
     setCurrentPage(1);
     setIsRecommendation(false);
+    setPaxOnly(false);
   };
 
   const handlePlayerCountChange = (event, newCount) => {
@@ -248,12 +266,13 @@ const GameList = () => {
 
   // Fetch games with filters
   const { data: response = { games: [], total: 0 }, isLoading, error, isFetching } = useQuery({
-    queryKey: ['games', searchTerm, playerOptions, selectedDesigners, selectedArtists, selectedMechanics, selectedCategories, weight, sortBy, currentPage],
+    queryKey: ['games', searchTerm, playerOptions, selectedDesigners, selectedArtists, selectedMechanics, selectedCategories, weight, sortBy, currentPage, paxOnly],
     queryFn: async () => {
       const params = {
         limit: gamesPerPage,
         skip: (currentPage - 1) * gamesPerPage,
-        sort_by: sortBy
+        sort_by: sortBy,
+        pax_only: paxOnly
       };
 
       if (searchTerm) params.search = searchTerm;
@@ -302,6 +321,15 @@ const GameList = () => {
       setTotalGames(response.total);
     }
   }, [response, isRecommendation]);
+
+  useEffect(() => {
+    if (isRecommendation) {
+      const newGameList = paxOnly ? paxRecommendations : allRecommendations;
+      setGameList(newGameList);
+      setTotalGames(newGameList.length);
+      setCurrentPage(1);
+    }
+  }, [isRecommendation, paxOnly, allRecommendations, paxRecommendations]);
 
   const { games = [], total = 0 } = response || { games: [], total: 0 };
 
@@ -488,6 +516,11 @@ const GameList = () => {
           {/* Filter Bar */}
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ flexWrap: 'wrap', gap: 1 }}>
             <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
+              <FormControlLabel
+                control={<Switch checked={paxOnly} onChange={(e) => setPaxOnly(e.target.checked)} />}
+                label="PAX Games Only"
+                sx={{ mr: 2 }}
+              />
               <Button
                 variant={activeFilter === 'sort' ? 'contained' : 'outlined'}
                 onClick={() => handleToggleFilter('sort')}

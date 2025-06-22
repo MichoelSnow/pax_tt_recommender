@@ -139,7 +139,8 @@ async def list_games(
     recommendations: Optional[str] = None,
     weight: Optional[str] = None,
     mechanics: Optional[str] = None,
-    categories: Optional[str] = None
+    categories: Optional[str] = None,
+    pax_only: Optional[bool] = False
 ):
     try:
         # Use timeout wrapper to prevent hanging
@@ -157,6 +158,7 @@ async def list_games(
             weight=weight,
             mechanics=mechanics,
             categories=categories,
+            pax_only=pax_only,
             timeout_seconds=25
         )
         return {"games": games, "total": total}
@@ -185,7 +187,8 @@ async def get_recommendations(
     db: Session = Depends(get_db),
     limit: int = 10,
     disliked_games: Optional[str] = None,
-    anti_weight: float = 1.0
+    anti_weight: float = 1.0,
+    pax_only: Optional[bool] = False
 ):
     """
     Get game recommendations based on a game ID.
@@ -196,6 +199,7 @@ async def get_recommendations(
         limit: Maximum number of recommendations to return
         disliked_games: Comma-separated list of game IDs to use as anti-recommendations
         anti_weight: Weight to apply to anti-recommendations (higher values = stronger anti-recommendations)
+        pax_only: If true, only recommend games that are in the PAX games table
     """
     try:
         # Parse disliked games if provided
@@ -214,7 +218,8 @@ async def get_recommendations(
             limit=limit,
             liked_games=[game_id],
             disliked_games=disliked_games_list,
-            anti_weight=anti_weight
+            anti_weight=anti_weight,
+            pax_only=pax_only
         )
         return recommendations
     except Exception as e:
@@ -314,6 +319,7 @@ class RecommendationRequest(schemas.BaseModel):
     disliked_games: Optional[List[int]] = None
     limit: int = 24
     anti_weight: float = 1.0
+    pax_only: bool = False
 
 @app.post("/recommendations", response_model=List[schemas.BoardGameOut])
 async def get_multi_game_recommendations(
@@ -329,7 +335,8 @@ async def get_multi_game_recommendations(
             limit=request.limit,
             liked_games=request.liked_games,
             disliked_games=request.disliked_games,
-            anti_weight=request.anti_weight
+            anti_weight=request.anti_weight,
+            pax_only=request.pax_only
         )
         return recommendations
     except Exception as e:
