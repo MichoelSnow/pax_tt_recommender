@@ -5,7 +5,6 @@
 
 
 # UI 
-- Move the filters to the top of the page
 - filter by pax games 
 - recommend based on multiple games (pro and con)
 

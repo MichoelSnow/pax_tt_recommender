@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, HttpUrl
 from typing import List, Optional, Dict, Any
 
 
@@ -172,16 +172,20 @@ class FilterOptions(BaseModel):
 
 
 class MechanicFrequency(BaseModel):
-    name: str
-    count: int
+    boardgamemechanic_id: int
+    boardgamemechanic_name: str
+    frequency: int
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class Mechanic(MechanicBase):
+    id: int
     game_id: int
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class BoardGameList(BoardGameBase):
@@ -222,3 +226,78 @@ class PAXGameOut(PAXGameBase):
     board_game: Optional[BoardGameOut] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SuggestedPlayer(BaseModel):
+    id: int
+    game_id: int
+    player_count: str
+    best: int
+    recommended: int
+    not_recommended: int
+    recommendation_level: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class Category(BaseModel):
+    id: int
+    game_id: int
+    boardgamecategory_id: int
+    boardgamecategory_name: str
+
+    class Config:
+        from_attributes = True
+
+
+class Designer(BaseModel):
+    id: int
+    game_id: int
+    boardgamedesigner_id: int
+    boardgamedesigner_name: str
+
+    class Config:
+        from_attributes = True
+
+
+class Artist(BaseModel):
+    id: int
+    game_id: int
+    boardgameartist_id: int
+    boardgameartist_name: str
+
+    class Config:
+        from_attributes = True
+
+
+class Publisher(BaseModel):
+    id: int
+    game_id: int
+    boardgamepublisher_id: int
+    boardgamepublisher_name: str
+
+    class Config:
+        from_attributes = True
+
+
+class BoardGame(BoardGameBase):
+    id: int
+    mechanics: List[Mechanic] = []
+    categories: List[Category] = []
+    designers: List[Designer] = []
+    artists: List[Artist] = []
+    publishers: List[Publisher] = []
+    suggested_players: List[SuggestedPlayer] = []
+
+    class Config:
+        from_attributes = True
+
+
+class CategoryFrequency(BaseModel):
+    boardgamecategory_id: int
+    boardgamecategory_name: str
+    frequency: int
+
+    class Config:
+        from_attributes = True

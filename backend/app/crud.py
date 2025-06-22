@@ -156,13 +156,22 @@ def get_games(
             logger.error(f"Error getting total count: {str(e)}")
             total = 0
 
-        # Verify that the sort_by field exists in the model
-        if not hasattr(models.BoardGame, sort_by):
+        # Verify that the sort_by field exists in the model, or handle special cases
+        if sort_by.startswith("name_"):
+            order_field = "name"
+            order_dir = sort_by.split('_')[1]
+        elif hasattr(models.BoardGame, sort_by):
+            order_field = sort_by
+            order_dir = "asc"
+        else:
             raise ValueError(f"Invalid sort field: {sort_by}")
 
-        # Order by the selected rank field, with NULL ranks appearing last
-        rank_field = getattr(models.BoardGame, sort_by)
-        query = query.order_by(rank_field.asc().nullslast())
+        # Order by the selected field, with NULLs last
+        rank_field = getattr(models.BoardGame, order_field)
+        if order_dir == 'desc':
+            query = query.order_by(rank_field.desc().nullslast())
+        else:
+            query = query.order_by(rank_field.asc().nullslast())
 
         # Apply pagination with timeout protection
         try:
@@ -293,10 +302,30 @@ def add_publisher(db: Session, game_id: int, publisher_name: str):
     return publisher
 
 def get_mechanics_by_frequency(db: Session):
+    """Returns mechanics sorted by frequency of use in games."""
     return db.query(
-        models.Mechanic.boardgamemechanic_name.label('name'),
-        func.count(models.Mechanic.boardgamemechanic_name).label('count')
-    ).group_by(models.Mechanic.boardgamemechanic_name).order_by(func.count(models.Mechanic.boardgamemechanic_name).desc()).all()
+        models.Mechanic.boardgamemechanic_id,
+        models.Mechanic.boardgamemechanic_name, 
+        func.count(models.Mechanic.game_id).label('frequency')
+    ).group_by(
+        models.Mechanic.boardgamemechanic_id,
+        models.Mechanic.boardgamemechanic_name
+    ).order_by(
+        func.count(models.Mechanic.game_id).desc()
+    ).all()
+
+def get_categories_by_frequency(db: Session):
+    """Returns categories sorted by frequency of use in games."""
+    return db.query(
+        models.Category.boardgamecategory_id,
+        models.Category.boardgamecategory_name,
+        func.count(models.Category.game_id).label('frequency')
+    ).group_by(
+        models.Category.boardgamecategory_id,
+        models.Category.boardgamecategory_name
+    ).order_by(
+        func.count(models.Category.game_id).desc()
+    ).all()
 
 def get_recommendations(
     game_id: int,

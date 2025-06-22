@@ -285,3 +285,20 @@ async def proxy_image(url: str):
         logger.error(f"Error proxying image {url}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error fetching image")
 
+@app.get("/pax_games/with_board_game_links")
+def read_pax_games_with_board_game_links(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return crud.get_pax_games_with_board_game_links(db=db, skip=skip, limit=limit)
+
+@app.get("/mechanics/by_frequency", response_model=List[schemas.MechanicFrequency])
+def read_mechanics_by_frequency(db: Session = Depends(get_db)):
+    return crud.get_mechanics_by_frequency(db=db)
+
+@app.get("/categories/by_frequency", response_model=List[schemas.CategoryFrequency])
+def read_categories_by_frequency(db: Session = Depends(get_db)):
+    return crud.get_categories_by_frequency(db=db)
+
+@app.get("/categories", response_model=List[schemas.Category])
+def read_categories(db: Session = Depends(get_db)):
+    categories = crud.get_categories_cached(db)
+    return categories
+
