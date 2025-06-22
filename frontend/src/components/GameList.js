@@ -167,6 +167,7 @@ const GameList = () => {
       setCurrentPage(1);
       setIsRecommendation(true);
       setSortBy('recommendation_score');
+      setActiveFilter(null);
     } catch (err) {
       console.error('Failed to fetch recommendations:', err);
     }
@@ -474,6 +475,7 @@ const GameList = () => {
             variant="outlined"
             value={inputValue}
             onChange={handleSearchChange}
+            disabled={isRecommendation}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -490,6 +492,7 @@ const GameList = () => {
                 variant={activeFilter === 'sort' ? 'contained' : 'outlined'}
                 onClick={() => handleToggleFilter('sort')}
                 startIcon={<SortIcon />}
+                disabled={isRecommendation}
               >
                 Sort
               </Button>
@@ -497,6 +500,7 @@ const GameList = () => {
                 variant={activeFilter === 'players' ? 'contained' : 'outlined'}
                 onClick={() => handleToggleFilter('players')}
                 startIcon={<PeopleIcon />}
+                disabled={isRecommendation}
               >
                 Players
               </Button>
@@ -504,6 +508,7 @@ const GameList = () => {
                 variant={activeFilter === 'weight' ? 'contained' : 'outlined'}
                 onClick={() => handleToggleFilter('weight')}
                 startIcon={<PsychologyAltOutlinedIcon />}
+                disabled={isRecommendation}
               >
                 Weight
               </Button>
@@ -511,6 +516,7 @@ const GameList = () => {
                 variant={activeFilter === 'mechanics' ? 'contained' : 'outlined'}
                 onClick={() => handleToggleFilter('mechanics')}
                 startIcon={<ConstructionIcon />}
+                disabled={isRecommendation}
               >
                 Mechanics
               </Button>
@@ -518,11 +524,12 @@ const GameList = () => {
                 variant={activeFilter === 'categories' ? 'contained' : 'outlined'}
                 onClick={() => handleToggleFilter('categories')}
                 startIcon={<CategoryIcon />}
+                disabled={isRecommendation}
               >
                 Categories
               </Button>
             </Stack>
-            <Button onClick={handleResetFilters} size="small">
+            <Button onClick={handleResetFilters} size="small" disabled={isRecommendation}>
                 Reset Filters
             </Button>
           </Stack>

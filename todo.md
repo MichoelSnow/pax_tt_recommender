@@ -6,7 +6,6 @@
 
 # UI 
 - filter by pax games 
-- recommend based on multiple games (pro and con)
 
 # App
 - Move to a server
