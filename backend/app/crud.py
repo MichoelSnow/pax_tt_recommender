@@ -315,43 +315,36 @@ def get_mechanics_by_frequency(db: Session):
     ).all()
 
 def get_categories_by_frequency(db: Session):
-    """Returns categories sorted by frequency of use in games."""
     return db.query(
-        models.Category.boardgamecategory_id,
-        models.Category.boardgamecategory_name,
-        func.count(models.Category.game_id).label('frequency')
+        models.Category.boardgamecategory_id, 
+        models.Category.boardgamecategory_name, 
+        func.count(models.Category.boardgamecategory_id).label('frequency')
     ).group_by(
-        models.Category.boardgamecategory_id,
+        models.Category.boardgamecategory_id, 
         models.Category.boardgamecategory_name
     ).order_by(
-        func.count(models.Category.game_id).desc()
+        func.count(models.Category.boardgamecategory_id).desc()
     ).all()
 
 def get_recommendations(
-    game_id: int,
     db: Session,
-    limit: int = 10,
+    limit: int = 20,
+    liked_games: Optional[List[int]] = None,
     disliked_games: Optional[List[int]] = None,
     anti_weight: float = 1.0
 ) -> List[models.BoardGame]:
     """
-    Get game recommendations using the trained model.
-    
-    Args:
-        game_id: ID of the game to get recommendations for
-        db: Database session
-        limit: Maximum number of recommendations to return
-        disliked_games: Optional list of game IDs to use as anti-recommendations
-        anti_weight: Weight to apply to anti-recommendations
-        
-    Returns:
-        List of recommended BoardGame objects
+    Get game recommendations based on liked and disliked games.
     """
-    from .recommender import get_recommendations as get_model_recommendations
-    return get_model_recommendations(
-        game_id=game_id,
+    from . import recommender  # Lazy import to avoid circular dependencies
+    
+    # Load model if needed
+    recommender.ModelManager.get_instance().load_model()
+    
+    return recommender.get_recommendations(
         db=db,
         limit=limit,
+        liked_games=liked_games,
         disliked_games=disliked_games,
         anti_weight=anti_weight
     )

@@ -12,6 +12,7 @@ import {
   Divider,
   Paper,
   CircularProgress,
+  IconButton,
 } from '@mui/material';
 import axios from 'axios';
 import GameCard from './GameCard';
@@ -20,6 +21,10 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PsychologyAltOutlinedIcon from '@mui/icons-material/PsychologyAltOutlined';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import StarBorderOutlinedIcon from '@mui/icons-material/StarBorderOutlined';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
+import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
 
 // Helper function to decode HTML entities and preserve line breaks
 const decodeHtmlEntities = (text) => {
@@ -34,7 +39,7 @@ const decodeHtmlEntities = (text) => {
     .replace(/&nbsp;/g, ' ');
 };
 
-const GameDetails = ({ game, open, onClose, onFilter }) => {
+const GameDetails = ({ game, open, onClose, onFilter, likedGames, dislikedGames, onLike, onDislike }) => {
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedGame, setSelectedGame] = useState(null);
@@ -60,6 +65,16 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
   }, [game, open]);
 
   if (!game) return null;
+
+  const handleLikeClick = (e) => {
+    e.stopPropagation();
+    onLike(game);
+  };
+
+  const handleDislikeClick = (e) => {
+    e.stopPropagation();
+    onDislike(game);
+  };
 
   const handleRecommendationClick = async (rec) => {
     try {
@@ -170,6 +185,14 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
             )}
             <Box>
               <Typography variant="h5">{game.name}</Typography>
+              <Box>
+                <IconButton onClick={handleLikeClick} size="small">
+                  {likedGames.some(g => g.id === game.id) ? <ThumbUpIcon color="success" /> : <ThumbUpOutlinedIcon />}
+                </IconButton>
+                <IconButton onClick={handleDislikeClick} size="small">
+                  {dislikedGames.some(g => g.id === game.id) ? <ThumbDownIcon color="error" /> : <ThumbDownOutlinedIcon />}
+                </IconButton>
+              </Box>
             </Box>
           </Box>
         </DialogTitle>
@@ -218,6 +241,10 @@ const GameDetails = ({ game, open, onClose, onFilter }) => {
             setSelectedGame(null);
           }}
           onFilter={onFilter}
+          likedGames={likedGames}
+          dislikedGames={dislikedGames}
+          onLike={onLike}
+          onDislike={onDislike}
         />
       )}
     </>

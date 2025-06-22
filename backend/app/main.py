@@ -9,7 +9,7 @@ import logging
 import httpx
 from sqlalchemy.orm import Session
 from pathlib import Path
-from . import crud, models, schemas
+from . import crud, models, schemas, recommender
 from .database import engine, SessionLocal
 import time
 from functools import lru_cache
@@ -210,9 +210,9 @@ async def get_recommendations(
                 )
         
         recommendations = crud.get_recommendations(
-            game_id=game_id,
             db=db,
             limit=limit,
+            liked_games=[game_id],
             disliked_games=disliked_games_list,
             anti_weight=anti_weight
         )
@@ -301,4 +301,38 @@ def read_categories_by_frequency(db: Session = Depends(get_db)):
 def read_categories(db: Session = Depends(get_db)):
     categories = crud.get_categories_cached(db)
     return categories
+
+@app.on_event("startup")
+async def startup_event():
+    """Load the model at startup."""
+    logger.info("Loading recommendation model...")
+    recommender.ModelManager.get_instance().load_model()
+    logger.info("Recommendation model loaded.")
+
+class RecommendationRequest(schemas.BaseModel):
+    liked_games: Optional[List[int]] = None
+    disliked_games: Optional[List[int]] = None
+    limit: int = 24
+    anti_weight: float = 1.0
+
+@app.post("/recommendations", response_model=List[schemas.BoardGameOut])
+async def get_multi_game_recommendations(
+    request: RecommendationRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Get game recommendations based on a list of liked and disliked games.
+    """
+    try:
+        recommendations = crud.get_recommendations(
+            db=db,
+            limit=request.limit,
+            liked_games=request.liked_games,
+            disliked_games=request.disliked_games,
+            anti_weight=request.anti_weight
+        )
+        return recommendations
+    except Exception as e:
+        logger.error(f"Error getting recommendations: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error getting recommendations")
 

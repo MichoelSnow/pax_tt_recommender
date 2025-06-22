@@ -47,6 +47,7 @@ import GameDetails from './GameDetails';
 import GameCard from './GameCard';
 import ConstructionIcon from '@mui/icons-material/Construction';
 import CategoryIcon from '@mui/icons-material/Category';
+import LikedGamesDialog from './LikedGamesDialog';
 
 // Helper function to decode HTML entities and preserve line breaks
 const decodeHtmlEntities = (text) => {
@@ -100,6 +101,7 @@ const GameList = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [searchParams, setSearchParams] = useSearchParams();
+  const [inputValue, setInputValue] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [playerOptions, setPlayerOptions] = useState({ count: null, recommendation: 'allowed' });
   const [weight, setWeight] = useState({
@@ -118,19 +120,75 @@ const GameList = () => {
   const gamesPerPage = 24;
   const [activeFilter, setActiveFilter] = useState(null);
 
+  const [likedGames, setLikedGames] = useState([]);
+  const [dislikedGames, setDislikedGames] = useState([]);
+  const [isLikedGamesDialogOpen, setIsLikedGamesDialogOpen] = useState(false);
+  const [gameList, setGameList] = useState([]);
+  const [totalGames, setTotalGames] = useState(0);
+  const [isRecommendation, setIsRecommendation] = useState(false);
+
+  const handleLikeGame = (game) => {
+    setLikedGames(prev => {
+      if (prev.find(g => g.id === game.id)) {
+        return prev.filter(g => g.id !== game.id); // un-like
+      } else {
+        return [...prev, game]; // like
+      }
+    });
+    setDislikedGames(prev => prev.filter(g => g.id !== game.id)); // remove from disliked
+  };
+
+  const handleDislikeGame = (game) => {
+    setDislikedGames(prev => {
+      if (prev.find(g => g.id === game.id)) {
+        return prev.filter(g => g.id !== game.id); // un-dislike
+      } else {
+        return [...prev, game]; // dislike
+      }
+    });
+    setLikedGames(prev => prev.filter(g => g.id !== game.id)); // remove from liked
+  };
+
+  const handleShowAllGames = () => {
+    setIsRecommendation(false);
+    setCurrentPage(1);
+    setSortBy('rank');
+  };
+
+  const handleRecommend = async () => {
+    try {
+      const response = await axios.post('http://localhost:8000/recommendations', {
+        liked_games: likedGames.map(g => g.id),
+        disliked_games: dislikedGames.map(g => g.id),
+        limit: 50
+      });
+      setGameList(response.data);
+      setTotalGames(response.data.length);
+      setCurrentPage(1);
+      setIsRecommendation(true);
+      setSortBy('recommendation_score');
+    } catch (err) {
+      console.error('Failed to fetch recommendations:', err);
+    }
+  };
+
   const handleToggleFilter = (filter) => {
     setActiveFilter(prev => (prev === filter ? null : filter));
   };
 
   const handleResetFilters = () => {
+    setInputValue('');
     setSearchTerm('');
     setPlayerOptions({ count: null, recommendation: 'allowed' });
     setWeight({ beginner: false, midweight: false, heavy: false });
     setSelectedMechanics([]);
     setSelectedCategories([]);
+    setSelectedDesigners([]);
+    setSelectedArtists([]);
     setSortBy('rank');
     setActiveFilter(null);
     setCurrentPage(1);
+    setIsRecommendation(false);
   };
 
   const handlePlayerCountChange = (event, newCount) => {
@@ -147,7 +205,7 @@ const GameList = () => {
   };
 
   // Debounced search function
-  const debouncedSearch = useCallback(
+  const debouncedSetSearchTerm = useCallback(
     debounce((value) => {
       setSearchTerm(value);
     }, 500),
@@ -156,7 +214,8 @@ const GameList = () => {
 
   // Handle search input change
   const handleSearchChange = (event) => {
-    debouncedSearch(event.target.value);
+    setInputValue(event.target.value);
+    debouncedSetSearchTerm(event.target.value);
   };
 
   // Remove page parameter from URL on mount
@@ -233,9 +292,17 @@ const GameList = () => {
       return response.data;
     },
     keepPreviousData: true,
+    enabled: !isRecommendation, // Disable when showing recommendations
   });
 
-  const { games = [], total = 0 } = response;
+  useEffect(() => {
+    if (!isRecommendation && response?.games) {
+      setGameList(response.games);
+      setTotalGames(response.total);
+    }
+  }, [response, isRecommendation]);
+
+  const { games = [], total = 0 } = response || { games: [], total: 0 };
 
   // Reset page when filters change
   useEffect(() => {
@@ -347,9 +414,9 @@ const GameList = () => {
   const renderGameGrid = () => {
     if (isLoading) {
       return (
-        <Grid container spacing={2}>
-          {Array.from(new Array(12)).map((_, index) => (
-            <Grid item xs={12} sm={6} md={4} key={index}>
+        <Grid container spacing={3}>
+          {Array.from(new Array(gamesPerPage)).map((_, index) => (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={index}>
               <GameCardSkeleton />
             </Grid>
           ))}
@@ -359,37 +426,53 @@ const GameList = () => {
 
     if (error) {
       return (
-        <Alert severity="error">Failed to load games. Please try again later.</Alert>
+        <Alert severity="error" sx={{ mt: 2 }}>
+          Failed to load games: {error.message}
+        </Alert>
       );
     }
 
+    if (gameList.length === 0) {
+      return (
+        <Box sx={{ textAlign: 'center', mt: 4 }}>
+          <Typography variant="h6">No games found</Typography>
+          <Typography color="text.secondary">Try adjusting your filters or search term.</Typography>
+        </Box>
+      );
+    }
+
+    const listToRender = isRecommendation
+      ? gameList.slice((currentPage - 1) * gamesPerPage, currentPage * gamesPerPage)
+      : gameList;
+
     return (
-      <Box sx={{ width: '100%', overflow: 'hidden' }}>
-        <Grid container spacing={3} sx={{ width: '100%', margin: 0 }}>
-          {games.map((game) => (
-            <Grid item xs={12} sm={6} md={4} key={game.id} sx={{ width: '100%', padding: '12px !important' }}>
-              <Box sx={{ width: '100%', height: '100%' }}>
-                <GameCard
-                  game={game}
-                  onClick={() => handleGameClick(game)}
-                  sortBy={sortBy}
-                />
-              </Box>
-            </Grid>
-          ))}
-        </Grid>
-      </Box>
+      <Grid container spacing={3}>
+        {listToRender.map((game) => (
+          <Grid item xs={12} sm={6} md={4} lg={3} key={game.id}>
+            <GameCard 
+              game={game} 
+              onClick={() => handleGameClick(game)} 
+              sortBy={isRecommendation ? 'recommendation_score' : sortBy}
+              liked={likedGames.some(g => g.id === game.id)}
+              disliked={dislikedGames.some(g => g.id === game.id)}
+              onLike={() => handleLikeGame(game)}
+              onDislike={() => handleDislikeGame(game)}
+            />
+          </Grid>
+        ))}
+      </Grid>
     );
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4, width: '100%' }}>
-      <Stack spacing={2} sx={{ mb: 4 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+    <>
+      <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Stack spacing={2} sx={{ mb: 2 }}>
+          {/* Search Input */}
           <TextField
-            fullWidth
+            label="Search Games"
             variant="outlined"
-            placeholder="Search by game title"
+            value={inputValue}
             onChange={handleSearchChange}
             InputProps={{
               startAdornment: (
@@ -399,169 +482,226 @@ const GameList = () => {
               ),
             }}
           />
-        </Stack>
 
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ flexWrap: 'wrap', gap: 1 }}>
-          <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
-            <Button
-              variant={activeFilter === 'sort' ? 'contained' : 'outlined'}
-              onClick={() => handleToggleFilter('sort')}
-              startIcon={<SortIcon />}
-            >
-              Sort
-            </Button>
-            <Button
-              variant={activeFilter === 'players' ? 'contained' : 'outlined'}
-              onClick={() => handleToggleFilter('players')}
-              startIcon={<PeopleIcon />}
-            >
-              Players
-            </Button>
-            <Button
-              variant={activeFilter === 'weight' ? 'contained' : 'outlined'}
-              onClick={() => handleToggleFilter('weight')}
-              startIcon={<PsychologyAltOutlinedIcon />}
-            >
-              Weight
-            </Button>
-            <Button
-              variant={activeFilter === 'mechanics' ? 'contained' : 'outlined'}
-              onClick={() => handleToggleFilter('mechanics')}
-              startIcon={<ConstructionIcon />}
-            >
-              Mechanics
-            </Button>
-            <Button
-              variant={activeFilter === 'categories' ? 'contained' : 'outlined'}
-              onClick={() => handleToggleFilter('categories')}
-              startIcon={<CategoryIcon />}
-            >
-              Categories
+          {/* Filter Bar */}
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ flexWrap: 'wrap', gap: 1 }}>
+            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
+              <Button
+                variant={activeFilter === 'sort' ? 'contained' : 'outlined'}
+                onClick={() => handleToggleFilter('sort')}
+                startIcon={<SortIcon />}
+              >
+                Sort
+              </Button>
+              <Button
+                variant={activeFilter === 'players' ? 'contained' : 'outlined'}
+                onClick={() => handleToggleFilter('players')}
+                startIcon={<PeopleIcon />}
+              >
+                Players
+              </Button>
+              <Button
+                variant={activeFilter === 'weight' ? 'contained' : 'outlined'}
+                onClick={() => handleToggleFilter('weight')}
+                startIcon={<PsychologyAltOutlinedIcon />}
+              >
+                Weight
+              </Button>
+              <Button
+                variant={activeFilter === 'mechanics' ? 'contained' : 'outlined'}
+                onClick={() => handleToggleFilter('mechanics')}
+                startIcon={<ConstructionIcon />}
+              >
+                Mechanics
+              </Button>
+              <Button
+                variant={activeFilter === 'categories' ? 'contained' : 'outlined'}
+                onClick={() => handleToggleFilter('categories')}
+                startIcon={<CategoryIcon />}
+              >
+                Categories
+              </Button>
+            </Stack>
+            <Button onClick={handleResetFilters} size="small">
+                Reset Filters
             </Button>
           </Stack>
-          <Button variant="text" onClick={handleResetFilters}>Reset Filters</Button>
-        </Stack>
-        {activeFilter && (
-          <Stack spacing={1} sx={{ mt: 1, gap: 1 }}>
-            {activeFilter === 'sort' && (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {sortOptions.map(option => (
-                  <Button
-                    key={option.value}
-                    variant={sortBy === option.value ? 'contained' : 'outlined'}
-                    onClick={() => setSortBy(option.value)}
-                    size="small"
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </Box>
-            )}
-            {activeFilter === 'players' && (
-              <Stack spacing={1} sx={{ gap: 1 }}>
+          
+          {/* Active Filter Panel */}
+          {activeFilter && (
+            <>
+              {activeFilter === 'sort' && (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                  <Button
-                    variant={playerOptions.count === null ? 'contained' : 'outlined'}
-                    onClick={() => handlePlayerCountChange(null, null)}
-                    size="small"
-                  >
-                    Any
-                  </Button>
-                  {playerCountOptions.map(count => (
+                  {isRecommendation && (
                     <Button
-                      key={count}
-                      variant={playerOptions.count === count ? 'contained' : 'outlined'}
-                      onClick={() => handlePlayerCountChange(null, count)}
+                      variant={sortBy === 'recommendation_score' ? 'contained' : 'outlined'}
+                      onClick={() => setSortBy('recommendation_score')}
                       size="small"
                     >
-                      {count}
+                      Relevance
+                    </Button>
+                  )}
+                  {sortOptions.map(option => (
+                    <Button
+                      key={option.value}
+                      variant={sortBy === option.value ? 'contained' : 'outlined'}
+                      onClick={() => setSortBy(option.value)}
+                      size="small"
+                    >
+                      {option.label}
                     </Button>
                   ))}
                 </Box>
-                {playerOptions.count && (
+              )}
+              {activeFilter === 'players' && (
+                <Stack spacing={1} sx={{ gap: 1 }}>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    <Button size="small" variant={playerOptions.recommendation === 'allowed' ? 'contained' : 'outlined'} onClick={() => handlePlayerRecChange(null, 'allowed')}>Allowed</Button>
-                    <Button size="small" variant={playerOptions.recommendation === 'recommended' ? 'contained' : 'outlined'} onClick={() => handlePlayerRecChange(null, 'recommended')}>Recommended</Button>
-                    <Button size="small" variant={playerOptions.recommendation === 'best' ? 'contained' : 'outlined'} onClick={() => handlePlayerRecChange(null, 'best')}>Best</Button>
+                    <Button
+                      variant={playerOptions.count === null ? 'contained' : 'outlined'}
+                      onClick={() => handlePlayerCountChange(null, null)}
+                      size="small"
+                    >
+                      Any
+                    </Button>
+                    {playerCountOptions.map(count => (
+                      <Button
+                        key={count}
+                        variant={playerOptions.count === count ? 'contained' : 'outlined'}
+                        onClick={() => handlePlayerCountChange(null, count)}
+                        size="small"
+                      >
+                        {count}
+                      </Button>
+                    ))}
                   </Box>
-                )}
-              </Stack>
-            )}
-            {activeFilter === 'weight' && (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                <Button size="small" variant={weight.beginner ? 'contained' : 'outlined'} onClick={() => setWeight(w => ({ ...w, beginner: !w.beginner }))}>Beginner Friendly (≤ 2.0)</Button>
-                <Button size="small" variant={weight.midweight ? 'contained' : 'outlined'} onClick={() => setWeight(w => ({ ...w, midweight: !w.midweight }))}>Midweight (2.0 - 4.0)</Button>
-                <Button size="small" variant={weight.heavy ? 'contained' : 'outlined'} onClick={() => setWeight(w => ({ ...w, heavy: !w.heavy }))}>Heavy Cardboard (≥ 4.0)</Button>
-              </Box>
-            )}
-            {activeFilter === 'mechanics' && (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {popularMechanics.map(mech => (
-                  <Button
-                    key={mech.boardgamemechanic_id}
-                    variant={selectedMechanics.some(m => m.boardgamemechanic_id === mech.boardgamemechanic_id) ? 'contained' : 'outlined'}
-                    onClick={() => {
-                      const isSelected = selectedMechanics.some(m => m.boardgamemechanic_id === mech.boardgamemechanic_id);
-                      if (isSelected) {
-                        setSelectedMechanics(selectedMechanics.filter(m => m.boardgamemechanic_id !== mech.boardgamemechanic_id));
-                      } else {
-                        setSelectedMechanics([...selectedMechanics, mech]);
-                      }
-                    }}
-                    size="small"
-                  >
-                    {mech.boardgamemechanic_name}
-                  </Button>
-                ))}
-              </Box>
-            )}
-            {activeFilter === 'categories' && (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {popularCategories.map(cat => (
-                  <Button
-                    key={cat.boardgamecategory_id}
-                    variant={selectedCategories.some(c => c.boardgamecategory_id === cat.boardgamecategory_id) ? 'contained' : 'outlined'}
-                    onClick={() => {
-                      const isSelected = selectedCategories.some(c => c.boardgamecategory_id === cat.boardgamecategory_id);
-                      if (isSelected) {
-                        setSelectedCategories(selectedCategories.filter(c => c.boardgamecategory_id !== cat.boardgamecategory_id));
-                      } else {
-                        setSelectedCategories([...selectedCategories, cat]);
-                      }
-                    }}
-                    size="small"
-                  >
-                    {cat.boardgamecategory_name}
-                  </Button>
-                ))}
-              </Box>
-            )}
-          </Stack>
+                  {playerOptions.count && (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      <Button size="small" variant={playerOptions.recommendation === 'allowed' ? 'contained' : 'outlined'} onClick={() => handlePlayerRecChange(null, 'allowed')}>Allowed</Button>
+                      <Button size="small" variant={playerOptions.recommendation === 'recommended' ? 'contained' : 'outlined'} onClick={() => handlePlayerRecChange(null, 'recommended')}>Recommended</Button>
+                      <Button size="small" variant={playerOptions.recommendation === 'best' ? 'contained' : 'outlined'} onClick={() => handlePlayerRecChange(null, 'best')}>Best</Button>
+                    </Box>
+                  )}
+                </Stack>
+              )}
+              {activeFilter === 'weight' && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  <Button size="small" variant={weight.beginner ? 'contained' : 'outlined'} onClick={() => setWeight(w => ({ ...w, beginner: !w.beginner }))}>Beginner Friendly (≤ 2.0)</Button>
+                  <Button size="small" variant={weight.midweight ? 'contained' : 'outlined'} onClick={() => setWeight(w => ({ ...w, midweight: !w.midweight }))}>Midweight (2.0 - 4.0)</Button>
+                  <Button size="small" variant={weight.heavy ? 'contained' : 'outlined'} onClick={() => setWeight(w => ({ ...w, heavy: !w.heavy }))}>Heavy Cardboard (≥ 4.0)</Button>
+                </Box>
+              )}
+              {activeFilter === 'mechanics' && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {popularMechanics.map(mech => (
+                    <Button
+                      key={mech.boardgamemechanic_id}
+                      variant={selectedMechanics.some(m => m.boardgamemechanic_id === mech.boardgamemechanic_id) ? 'contained' : 'outlined'}
+                      onClick={() => {
+                        const isSelected = selectedMechanics.some(m => m.boardgamemechanic_id === mech.boardgamemechanic_id);
+                        if (isSelected) {
+                          setSelectedMechanics(selectedMechanics.filter(m => m.boardgamemechanic_id !== mech.boardgamemechanic_id));
+                        } else {
+                          setSelectedMechanics([...selectedMechanics, mech]);
+                        }
+                      }}
+                      size="small"
+                    >
+                      {mech.boardgamemechanic_name}
+                    </Button>
+                  ))}
+                </Box>
+              )}
+              {activeFilter === 'categories' && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {popularCategories.map(cat => (
+                    <Button
+                      key={cat.boardgamecategory_id}
+                      variant={selectedCategories.some(c => c.boardgamecategory_id === cat.boardgamecategory_id) ? 'contained' : 'outlined'}
+                      onClick={() => {
+                        const isSelected = selectedCategories.some(c => c.boardgamecategory_id === cat.boardgamecategory_id);
+                        if (isSelected) {
+                          setSelectedCategories(selectedCategories.filter(c => c.boardgamecategory_id !== cat.boardgamecategory_id));
+                        } else {
+                          setSelectedCategories([...selectedCategories, cat]);
+                        }
+                      }}
+                      size="small"
+                    >
+                      {cat.boardgamecategory_name}
+                    </Button>
+                  ))}
+                </Box>
+              )}
+            </>
+          )}
+
+          {/* Action Buttons and Filter Chips */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+              {isRecommendation ? (
+                <Button variant="contained" onClick={handleShowAllGames}>
+                  Show All Games
+                </Button>
+              ) : (
+                <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleRecommend}
+                    disabled={likedGames.length === 0 && dislikedGames.length === 0}
+                >
+                    Recommend Games
+                </Button>
+              )}
+              <Button
+                  onClick={() => setIsLikedGamesDialogOpen(true)}
+                  size="small"
+              >
+                  Liked/Disliked ({likedGames.length}/{dislikedGames.length})
+              </Button>
+              {renderFilterChips()}
+          </Box>
+        </Stack>
+
+        {isFetching && !isRecommendation && (
+          <Box sx={{ width: '100%', mb: 2 }}>
+            <CircularProgress size={24} />
+          </Box>
         )}
-        {renderFilterChips()}
-      </Stack>
+        
+        {renderGameGrid()}
 
-      {renderGameGrid()}
-
-      {total > 0 && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
           <Pagination
-            count={Math.ceil(total / gamesPerPage)}
+            count={Math.ceil(totalGames / gamesPerPage)}
             page={currentPage}
             onChange={handlePageChange}
             color="primary"
-            size={isMobile ? "small" : "large"}
-            disabled={isFetching}
+            showFirstButton
+            showLastButton
           />
         </Box>
-      )}
-      <GameDetails
-        game={selectedGame}
-        open={detailsOpen}
-        onClose={() => setDetailsOpen(false)}
-        onFilter={handleFilter}
+
+        {selectedGame && (
+          <GameDetails
+            game={selectedGame}
+            open={detailsOpen}
+            onClose={() => setDetailsOpen(false)}
+            onFilter={handleFilter}
+            likedGames={likedGames}
+            dislikedGames={dislikedGames}
+            onLike={handleLikeGame}
+            onDislike={handleDislikeGame}
+          />
+        )}
+      </Container>
+      <LikedGamesDialog
+        open={isLikedGamesDialogOpen}
+        onClose={() => setIsLikedGamesDialogOpen(false)}
+        likedGames={likedGames}
+        dislikedGames={dislikedGames}
+        onRemoveLike={handleLikeGame}
+        onRemoveDislike={handleDislikeGame}
       />
-    </Container>
+    </>
   );
 };
 

@@ -1,9 +1,12 @@
 from sqlalchemy import Column, Integer, String, Float, Table, ForeignKey, JSON, DateTime, Boolean
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from .database import Base
+from typing import Optional
 
 class BoardGame(Base):
     __tablename__ = 'games'
+    __allow_unmapped__ = True
+    recommendation_score: Optional[float] = None
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String)

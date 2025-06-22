@@ -58,19 +58,19 @@ class ModelManager:
         return self._game_embeddings
 
 def get_recommendations(
-    game_id: int,
     db: Session,
-    limit: int = 5,
+    limit: int = 20,
+    liked_games: Optional[List[int]] = None,
     disliked_games: Optional[List[int]] = None,
-    anti_weight: float = 1.0
+    anti_weight: float = 1.0,
 ) -> List[models.BoardGame]:
     """
     Get game recommendations using the game embeddings.
     
     Args:
-        game_id: ID of the game to get recommendations for
         db: Database session
         limit: Maximum number of recommendations to return
+        liked_games: Optional list of game IDs to use as positive recommendations
         disliked_games: Optional list of game IDs to use as anti-recommendations
         anti_weight: Weight to apply to anti-recommendations
         
@@ -82,52 +82,26 @@ def get_recommendations(
         game_embeddings = model_manager.get_model()
         game_mapping = model_manager._game_mapping
         reverse_game_mapping = model_manager._reverse_game_mapping
+
+        if not liked_games and not disliked_games:
+            return []
         
-        
-        
-        if game_id not in game_mapping:
-            logger.warning(f"Game ID {game_id} not found in embeddings")
+        liked_indices = [game_mapping[g_id] for g_id in liked_games if g_id in game_mapping] if liked_games else []
+        disliked_indices = [game_mapping[dg_id] for dg_id in disliked_games if dg_id in game_mapping] if disliked_games else []
+
+        if not liked_indices and not disliked_indices:
+            logger.warning("None of the provided liked/disliked games were found in embeddings.")
             return []
 
-        # Get embedding for the input game
-        # game_idx = game_mapping[game_id]
-        # game_vec = game_embeddings[game_idx]
-
-
-        # Initialize scores array
-        # scores = np.zeros(game_embeddings.shape[0])
-        
-        # Add positive contribution from liked game
-        # scores += game_embeddings @ game_vec.T
-        
-        # # Apply anti-recommendations if provided
-        # if disliked_games:
-        #     disliked_vec = np.zeros(game_embeddings.shape[1])
-        #     for dg_id in disliked_games:
-        #         if dg_id in game_mapping:
-        #             dg_idx = game_mapping[dg_id]
-        #             disliked_vec += game_embeddings[dg_idx].toarray().flatten()
-        #     if len(disliked_games) > 0:
-        #         disliked_vec /= len(disliked_games)
-        #         scores -= anti_weight * (game_embeddings @ disliked_vec)
-        
-        # # Remove input games from recommendations
-        # scores[game_idx] = -1
-        # if disliked_games:
-        #     for dg_id in disliked_games:
-        #         dg_id_str = str(dg_id)
-        #         if dg_id_str in game_mapping:
-        #             scores[game_mapping[dg_id_str]] = -1
-
-
-        # Compute query vector
-        liked_indices = [game_mapping[game_id]]
-        disliked_indices = [game_mapping[dg_id] for dg_id in disliked_games] if disliked_games else []
-
         # Compute mean of liked and disliked games
-        pos_vec = game_embeddings[liked_indices].mean(axis=0)
+        pos_vec = game_embeddings[liked_indices].mean(axis=0) if liked_indices else 0
         neg_vec = game_embeddings[disliked_indices].mean(axis=0) if disliked_indices else 0
+        
         query_vec = pos_vec - anti_weight * neg_vec
+        
+        if isinstance(query_vec, int):
+            return []
+
         query_vec = normalize(np.asarray(query_vec), norm='l2')
 
         # Compute cosine similarity between query vector and all game embeddings
@@ -135,21 +109,46 @@ def get_recommendations(
         scores = np.asarray(scores).ravel()
 
         # Zero out scores for input items
-        for idx in liked_indices + (disliked_indices or []):
+        for idx in liked_indices + disliked_indices:
             scores[idx] = -1
         
         # Get top N similar games
-        top_indices = np.argsort(scores)[-limit:][::-1]
-        recommended_ids = [
-            int(reverse_game_mapping[idx]) 
-            for idx in top_indices 
-            if scores[idx] > 0
-        ]
+        # Fetch more than limit to account for games not in DB
+        top_indices = np.argsort(scores)[-limit*2:][::-1]
+        
+        recommended_games_with_scores = []
+        for idx in top_indices:
+            if scores[idx] > 0:
+                recommended_games_with_scores.append(
+                    (int(reverse_game_mapping[idx]), scores[idx])
+                )
+
+        recommended_ids = [game[0] for game in recommended_games_with_scores]
         
         # Get full game objects from database
-        return db.query(models.BoardGame).filter(
+        games_from_db = db.query(models.BoardGame).filter(
             models.BoardGame.id.in_(recommended_ids)
         ).all()
+        
+        # Add score to game object and create a lookup
+        game_map = {}
+        for game in games_from_db:
+            game_map[game.id] = game
+        
+        # Build the final list, sorted by score
+        result_games = []
+        for game_id, score in recommended_games_with_scores:
+            if game_id in game_map:
+                game = game_map[game_id]
+                game.recommendation_score = score
+                result_games.append(game)
+            if len(result_games) >= limit:
+                break
+        
+        # Sort by recommendation score before returning
+        result_games.sort(key=lambda x: x.recommendation_score, reverse=True)
+
+        return result_games
         
     except Exception as e:
         logger.error(f"Error getting recommendations: {str(e)}", exc_info=True)
