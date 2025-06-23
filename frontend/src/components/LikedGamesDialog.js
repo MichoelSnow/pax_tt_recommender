@@ -9,7 +9,9 @@ import {
   Typography,
   Chip,
   Divider,
+  Tooltip,
 } from '@mui/material';
+import CancelIcon from '@mui/icons-material/Cancel';
 
 const LikedGamesDialog = ({
   open,
@@ -37,6 +39,11 @@ const LikedGamesDialog = ({
                   key={game.id}
                   label={game.name}
                   onDelete={() => onRemoveLike(game)}
+                  deleteIcon={
+                    <Tooltip title="Remove from liked">
+                      <CancelIcon />
+                    </Tooltip>
+                  }
                 />
               ))}
             </Box>
@@ -58,6 +65,11 @@ const LikedGamesDialog = ({
                   key={game.id}
                   label={game.name}
                   onDelete={() => onRemoveDislike(game)}
+                  deleteIcon={
+                    <Tooltip title="Remove from disliked">
+                      <CancelIcon />
+                    </Tooltip>
+                  }
                   color="error"
                   variant="outlined"
                 />

@@ -6,6 +6,7 @@ import {
   Typography,
   Box,
   IconButton,
+  Tooltip,
 } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -163,41 +164,53 @@ const GameCard = memo(({ game, onClick, sortBy, liked, disliked, onLike, onDisli
             {game.name}
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <PeopleIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-              <Typography variant="body2" color="text.secondary">
-                {game.min_players === game.max_players ? game.min_players : `${game.min_players} - ${game.max_players}`} players
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <AccessTimeIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-              <Typography variant="body2" color="text.secondary">
-                {game.min_playtime === game.max_playtime ? `${game.min_playtime} min` : `${game.min_playtime} - ${game.max_playtime} min`}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <PsychologyAltOutlinedIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-              <Typography variant="body2" color="text.secondary">
-                {game.average_weight ? `${game.average_weight.toFixed(1)}/5` : 'N/A'}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <StarBorderOutlinedIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-              <Typography variant="body2" color="text.secondary">
-                {game.average ? game.average.toFixed(1) : 'N/A'}
-                {sortBy === 'recommendation_score' && game.recommendation_score && ` (${(game.recommendation_score * 100).toFixed(0)}%)`}
-              </Typography>
-            </Box>
+            <Tooltip title="Player Count" placement="top">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <PeopleIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+                <Typography variant="body2" color="text.secondary">
+                  {game.min_players === game.max_players ? game.min_players : `${game.min_players} - ${game.max_players}`} players
+                </Typography>
+              </Box>
+            </Tooltip>
+            <Tooltip title="Play Time" placement="top">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <AccessTimeIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+                <Typography variant="body2" color="text.secondary">
+                  {game.min_playtime === game.max_playtime ? `${game.min_playtime} min` : `${game.min_playtime} - ${game.max_playtime} min`}
+                </Typography>
+              </Box>
+            </Tooltip>
+            <Tooltip title="Game Weight (Complexity)" placement="top">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <PsychologyAltOutlinedIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+                <Typography variant="body2" color="text.secondary">
+                  {game.average_weight ? `${game.average_weight.toFixed(1)}/5` : 'N/A'}
+                </Typography>
+              </Box>
+            </Tooltip>
+            <Tooltip title={sortBy === 'recommendation_score' ? 'Rating (Relevance)' : 'Average Rating'} placement="top">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <StarBorderOutlinedIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+                <Typography variant="body2" color="text.secondary">
+                  {game.average ? game.average.toFixed(1) : 'N/A'}
+                  {sortBy === 'recommendation_score' && game.recommendation_score && ` (${(game.recommendation_score * 100).toFixed(0)}%)`}
+                </Typography>
+              </Box>
+            </Tooltip>
           </Box>
         </CardContent>
       </Box>
       <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', p: 0.5, borderLeft: '1px solid', borderColor: 'divider' }}>
-        <IconButton onClick={handleLikeClick} size="small">
-          {liked ? <ThumbUpIcon color="success" /> : <ThumbUpOutlinedIcon />}
-        </IconButton>
-        <IconButton onClick={handleDislikeClick} size="small">
-          {disliked ? <ThumbDownIcon color="error" /> : <ThumbDownOutlinedIcon />}
-        </IconButton>
+        <Tooltip title={liked ? 'Unlike' : 'Like'} placement="left">
+          <IconButton onClick={handleLikeClick} size="small">
+            {liked ? <ThumbUpIcon color="success" /> : <ThumbUpOutlinedIcon />}
+          </IconButton>
+        </Tooltip>
+        <Tooltip title={disliked ? 'Remove dislike' : 'Dislike'} placement="left">
+          <IconButton onClick={handleDislikeClick} size="small">
+            {disliked ? <ThumbDownIcon color="error" /> : <ThumbDownOutlinedIcon />}
+          </IconButton>
+        </Tooltip>
       </Box>
     </Card>
   );

@@ -13,6 +13,7 @@ import {
   Paper,
   CircularProgress,
   IconButton,
+  Tooltip,
 } from '@mui/material';
 import axios from 'axios';
 import GameCard from './GameCard';
@@ -88,10 +89,12 @@ const GameDetails = ({ game, open, onClose, onFilter, likedGames, dislikedGames,
 
   const renderList = (items, label, type) => {
     if (!items || items.length === 0) return null;
+    const isFilterable = type === 'designer' || type === 'artist' || type === 'mechanic' || type === 'category';
+
     return (
       <Box sx={{ mb: 2 }}>
         <Typography variant="subtitle1" gutterBottom>
-          {label}
+          {label}{isFilterable && ' (filterable)'}
         </Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
           {items.map((item) => {
@@ -186,12 +189,16 @@ const GameDetails = ({ game, open, onClose, onFilter, likedGames, dislikedGames,
             <Box>
               <Typography variant="h5">{game.name}</Typography>
               <Box>
-                <IconButton onClick={handleLikeClick} size="small">
-                  {likedGames.some(g => g.id === game.id) ? <ThumbUpIcon color="success" /> : <ThumbUpOutlinedIcon />}
-                </IconButton>
-                <IconButton onClick={handleDislikeClick} size="small">
-                  {dislikedGames.some(g => g.id === game.id) ? <ThumbDownIcon color="error" /> : <ThumbDownOutlinedIcon />}
-                </IconButton>
+                <Tooltip title={likedGames.some(g => g.id === game.id) ? 'Unlike' : 'Like'}>
+                  <IconButton onClick={handleLikeClick} size="small">
+                    {likedGames.some(g => g.id === game.id) ? <ThumbUpIcon color="success" /> : <ThumbUpOutlinedIcon />}
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title={dislikedGames.some(g => g.id === game.id) ? 'Remove dislike' : 'Dislike'}>
+                  <IconButton onClick={handleDislikeClick} size="small">
+                    {dislikedGames.some(g => g.id === game.id) ? <ThumbDownIcon color="error" /> : <ThumbDownOutlinedIcon />}
+                  </IconButton>
+                </Tooltip>
               </Box>
             </Box>
           </Box>

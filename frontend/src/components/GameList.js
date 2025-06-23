@@ -30,6 +30,7 @@ import {
   Stack,
   Popover,
   Switch,
+  Tooltip,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
@@ -333,6 +334,38 @@ const GameList = () => {
 
   const { games = [], total = 0 } = response || { games: [], total: 0 };
 
+  const isSortFiltered = sortBy !== 'rank';
+  const sortButtonLabel = isSortFiltered ? (sortOptions.find(opt => opt.value === sortBy)?.label || 'Sort') : 'Sort';
+
+  const isPlayersFiltered = playerOptions.count !== null;
+  const playerButtonLabel = (() => {
+    if (!isPlayersFiltered) return 'Players';
+    let label = `${playerOptions.count}`;
+    if (playerOptions.count === playerCountOptions.length) label += '+';
+    label += ` Player${playerOptions.count > 1 ? 's' : ''}`;
+    if (playerOptions.recommendation && playerOptions.recommendation !== 'allowed') {
+      label += ` (${playerOptions.recommendation.charAt(0).toUpperCase() + playerOptions.recommendation.slice(1)})`;
+    }
+    return label;
+  })();
+
+  const activeWeightLabels = Object.entries(weight)
+    .filter(([, checked]) => checked)
+    .map(([key]) => {
+      if (key === 'beginner') return 'Beginner';
+      if (key === 'midweight') return 'Midweight';
+      if (key === 'heavy') return 'Heavy';
+      return '';
+    });
+  const isWeightFiltered = activeWeightLabels.length > 0;
+  const weightButtonLabel = isWeightFiltered ? activeWeightLabels.join(', ') : 'Weight';
+
+  const isMechanicsFiltered = selectedMechanics.length > 0;
+  const mechanicsButtonLabel = isMechanicsFiltered ? selectedMechanics.map(m => m.boardgamemechanic_name).join(', ') : 'Mechanics';
+
+  const isCategoriesFiltered = selectedCategories.length > 0;
+  const categoriesButtonLabel = isCategoriesFiltered ? selectedCategories.map(c => c.boardgamecategory_name).join(', ') : 'Categories';
+
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
@@ -516,55 +549,74 @@ const GameList = () => {
           {/* Filter Bar */}
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ flexWrap: 'wrap', gap: 1 }}>
             <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
-              <FormControlLabel
-                control={<Switch checked={paxOnly} onChange={(e) => setPaxOnly(e.target.checked)} />}
-                label="PAX Games Only"
-                sx={{ mr: 2 }}
-              />
-              <Button
-                variant={activeFilter === 'sort' ? 'contained' : 'outlined'}
-                onClick={() => handleToggleFilter('sort')}
-                startIcon={<SortIcon />}
-                disabled={isRecommendation}
-              >
-                Sort
-              </Button>
-              <Button
-                variant={activeFilter === 'players' ? 'contained' : 'outlined'}
-                onClick={() => handleToggleFilter('players')}
-                startIcon={<PeopleIcon />}
-                disabled={isRecommendation}
-              >
-                Players
-              </Button>
-              <Button
-                variant={activeFilter === 'weight' ? 'contained' : 'outlined'}
-                onClick={() => handleToggleFilter('weight')}
-                startIcon={<PsychologyAltOutlinedIcon />}
-                disabled={isRecommendation}
-              >
-                Weight
-              </Button>
-              <Button
-                variant={activeFilter === 'mechanics' ? 'contained' : 'outlined'}
-                onClick={() => handleToggleFilter('mechanics')}
-                startIcon={<ConstructionIcon />}
-                disabled={isRecommendation}
-              >
-                Mechanics
-              </Button>
-              <Button
-                variant={activeFilter === 'categories' ? 'contained' : 'outlined'}
-                onClick={() => handleToggleFilter('categories')}
-                startIcon={<CategoryIcon />}
-                disabled={isRecommendation}
-              >
-                Categories
-              </Button>
+              <Tooltip title="Filter for games available at PAX">
+                <FormControlLabel
+                  control={<Switch checked={paxOnly} onChange={(e) => setPaxOnly(e.target.checked)} />}
+                  label="PAX Games Only"
+                  sx={{ mr: 2 }}
+                />
+              </Tooltip>
+              <Tooltip title={sortButtonLabel}>
+                <Button
+                  variant={isSortFiltered || activeFilter === 'sort' ? 'contained' : 'outlined'}
+                  onClick={() => handleToggleFilter('sort')}
+                  startIcon={<SortIcon />}
+                  disabled={isRecommendation}
+                  sx={{ textTransform: 'none' }}
+                >
+                  {sortButtonLabel}
+                </Button>
+              </Tooltip>
+              <Tooltip title={playerButtonLabel}>
+                <Button
+                  variant={isPlayersFiltered || activeFilter === 'players' ? 'contained' : 'outlined'}
+                  onClick={() => handleToggleFilter('players')}
+                  startIcon={<PeopleIcon />}
+                  disabled={isRecommendation}
+                  sx={{ textTransform: 'none' }}
+                >
+                  {playerButtonLabel}
+                </Button>
+              </Tooltip>
+              <Tooltip title={weightButtonLabel}>
+                <Button
+                  variant={isWeightFiltered || activeFilter === 'weight' ? 'contained' : 'outlined'}
+                  onClick={() => handleToggleFilter('weight')}
+                  startIcon={<PsychologyAltOutlinedIcon />}
+                  disabled={isRecommendation}
+                  sx={{ textTransform: 'none' }}
+                >
+                  {weightButtonLabel}
+                </Button>
+              </Tooltip>
+              <Tooltip title={mechanicsButtonLabel}>
+                <Button
+                  variant={isMechanicsFiltered || activeFilter === 'mechanics' ? 'contained' : 'outlined'}
+                  onClick={() => handleToggleFilter('mechanics')}
+                  startIcon={<ConstructionIcon />}
+                  disabled={isRecommendation}
+                  sx={{ textTransform: 'none' }}
+                >
+                  {mechanicsButtonLabel}
+                </Button>
+              </Tooltip>
+              <Tooltip title={categoriesButtonLabel}>
+                <Button
+                  variant={isCategoriesFiltered || activeFilter === 'categories' ? 'contained' : 'outlined'}
+                  onClick={() => handleToggleFilter('categories')}
+                  startIcon={<CategoryIcon />}
+                  disabled={isRecommendation}
+                  sx={{ textTransform: 'none' }}
+                >
+                  {categoriesButtonLabel}
+                </Button>
+              </Tooltip>
             </Stack>
-            <Button onClick={handleResetFilters} size="small" disabled={isRecommendation}>
-                Reset Filters
-            </Button>
+            <Tooltip title="Clear all active filters and search">
+              <Button onClick={handleResetFilters} size="small" disabled={isRecommendation}>
+                  Reset Filters
+              </Button>
+            </Tooltip>
           </Stack>
           
           {/* Active Filter Panel */}
@@ -678,25 +730,31 @@ const GameList = () => {
           {/* Action Buttons and Filter Chips */}
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
               {isRecommendation ? (
-                <Button variant="contained" onClick={handleShowAllGames}>
-                  Show All Games
-                </Button>
+                <Tooltip title="Return to the main game list">
+                  <Button variant="contained" onClick={handleShowAllGames}>
+                    Show All Games
+                  </Button>
+                </Tooltip>
               ) : (
-                <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={handleRecommend}
-                    disabled={likedGames.length === 0 && dislikedGames.length === 0}
-                >
-                    Recommend Games
-                </Button>
+                <Tooltip title="Get recommendations based on liked/disliked games">
+                  <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={handleRecommend}
+                      disabled={likedGames.length === 0 && dislikedGames.length === 0}
+                  >
+                      Recommend Games
+                  </Button>
+                </Tooltip>
               )}
-              <Button
-                  onClick={() => setIsLikedGamesDialogOpen(true)}
-                  size="small"
-              >
-                  Liked/Disliked ({likedGames.length}/{dislikedGames.length})
-              </Button>
+              <Tooltip title="View and manage your liked and disliked games">
+                <Button
+                    onClick={() => setIsLikedGamesDialogOpen(true)}
+                    size="small"
+                >
+                    Liked/Disliked ({likedGames.length}/{dislikedGames.length})
+                </Button>
+              </Tooltip>
               {renderFilterChips()}
           </Box>
         </Stack>
