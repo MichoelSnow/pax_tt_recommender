@@ -84,13 +84,13 @@ def get_recommendations(
         game_embeddings = model_manager.get_model()
         game_mapping = model_manager._game_mapping
         reverse_game_mapping = model_manager._reverse_game_mapping
-
+        
         if not liked_games and not disliked_games:
             return []
         
         liked_indices = [game_mapping[g_id] for g_id in liked_games if g_id in game_mapping] if liked_games else []
         disliked_indices = [game_mapping[dg_id] for dg_id in disliked_games if dg_id in game_mapping] if disliked_games else []
-
+        
         if not liked_indices and not disliked_indices:
             logger.warning("None of the provided liked/disliked games were found in embeddings.")
             return []
@@ -132,7 +132,7 @@ def get_recommendations(
             recommended_ids = [rid for rid in recommended_ids if rid in pax_game_ids]
             # Re-filter the scored list to match the id list
             recommended_games_with_scores = [game for game in recommended_games_with_scores if game[0] in recommended_ids]
-
+        
         # Get full game objects from database
         games_from_db = db.query(models.BoardGame).filter(
             models.BoardGame.id.in_(recommended_ids)

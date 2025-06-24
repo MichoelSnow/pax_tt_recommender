@@ -1,20 +1,22 @@
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Request, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import OAuth2PasswordRequestForm
 from typing import List, Optional
 import logging
 import httpx
 from sqlalchemy.orm import Session
 from pathlib import Path
-from . import crud, models, schemas, recommender
+from . import crud, models, schemas, recommender, security
 from .database import engine, SessionLocal
 import time
 from functools import lru_cache
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 
 # Configure logging
 logging.basicConfig(
@@ -309,10 +311,9 @@ def read_categories(db: Session = Depends(get_db)):
 
 @app.on_event("startup")
 async def startup_event():
-    """Load the model at startup."""
-    logger.info("Loading recommendation model...")
+    """Load the recommender model on startup."""
+    logger.info("Loading recommender model...")
     recommender.ModelManager.get_instance().load_model()
-    logger.info("Recommendation model loaded.")
 
 class RecommendationRequest(schemas.BaseModel):
     liked_games: Optional[List[int]] = None
@@ -324,10 +325,12 @@ class RecommendationRequest(schemas.BaseModel):
 @app.post("/recommendations", response_model=List[schemas.BoardGameOut])
 async def get_multi_game_recommendations(
     request: RecommendationRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_active_user)
 ):
     """
     Get game recommendations based on a list of liked and disliked games.
+    Requires authentication.
     """
     try:
         recommendations = crud.get_recommendations(
@@ -342,4 +345,42 @@ async def get_multi_game_recommendations(
     except Exception as e:
         logger.error(f"Error getting recommendations: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error getting recommendations")
+
+# --- User and Auth Endpoints ---
+
+@app.post("/token", response_model=schemas.Token)
+async def login_for_access_token(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
+    user = crud.authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = security.create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/users/", response_model=schemas.User)
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), current_user: schemas.User = Depends(security.get_current_active_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admin users can create new users.")
+    db_user = crud.get_user_by_username(db, username=user.username)
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    return crud.create_user(db=db, user=user)
+
+@app.get("/users/me/", response_model=schemas.User)
+async def read_users_me(current_user: schemas.User = Depends(security.get_current_active_user)):
+    return current_user
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Create initial admin user.")
+    parser.add_argument("--username", required=True, help="Admin username")
+    parser.add_argument("--password", required=True, help="Admin password")
+    args = parser.parse_args()
+    security.create_initial_admin(args.username, args.password)
 

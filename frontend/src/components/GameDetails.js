@@ -10,18 +10,12 @@ import {
   Grid,
   Chip,
   Divider,
-  Paper,
   CircularProgress,
   IconButton,
   Tooltip,
 } from '@mui/material';
 import axios from 'axios';
 import GameCard from './GameCard';
-import PeopleIcon from '@mui/icons-material/People';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import PsychologyAltOutlinedIcon from '@mui/icons-material/PsychologyAltOutlined';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import StarBorderOutlinedIcon from '@mui/icons-material/StarBorderOutlined';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
@@ -79,7 +73,7 @@ const GameDetails = ({ game, open, onClose, onFilter, likedGames, dislikedGames,
 
   const handleRecommendationClick = async (rec) => {
     try {
-      const response = await axios.get(`http://localhost:8000/games/${rec.id}`);
+      await axios.get(`http://localhost:8000/games/${rec.id}`);
       onClose();
       onFilter('game', rec.id, rec.name);
     } catch (err) {

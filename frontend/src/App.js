@@ -6,6 +6,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import GameList from './components/GameList';
 import Navbar from './components/Navbar';
 import './App.css';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
+import { useLocation } from 'react-router-dom';
 
 // Create a client with optimized caching
 const queryClient = new QueryClient({
@@ -36,21 +40,42 @@ const theme = createTheme({
   },
 });
 
+const AppContent = () => {
+  const location = useLocation();
+  const showNavbar = location.pathname !== '/login';
+
+  return (
+    <>
+      {showNavbar && <Navbar />}
+      <Routes>
+        <Route 
+          path="/" 
+          element={
+            <ProtectedRoute>
+              <GameList />
+            </ProtectedRoute>
+          } 
+        />
+        <Route path="/login" element={<LoginPage />} />
+      </Routes>
+    </>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <AuthProvider>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Router future={{ 
           v7_startTransition: true,
           v7_relativeSplatPath: true 
         }}>
-          <Navbar />
-          <Routes>
-            <Route path="/" element={<GameList />} />
-          </Routes>
+            <AppContent />
         </Router>
       </ThemeProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

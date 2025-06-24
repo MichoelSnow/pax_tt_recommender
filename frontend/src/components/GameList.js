@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, memo } from 'react';
+import React, { useState, useCallback, useEffect, memo, useContext } from 'react';
 import {
   Container,
   Grid,
@@ -9,26 +9,26 @@ import {
   Box,
   Alert,
   Button,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  FormGroup,
+  // FormControl,
+  // InputLabel,
+  // Select,
+  // MenuItem,
+  // FormGroup,
   FormControlLabel,
-  Checkbox,
-  Divider,
-  Autocomplete,
-  CardMedia,
+  // Checkbox,
+  // Divider,
+  // Autocomplete,
+  // CardMedia,
   CircularProgress,
-  IconButton,
+  // IconButton,
   Chip,
   Skeleton,
   Pagination,
-  useMediaQuery,
-  useTheme,
+  // useMediaQuery,
+  // useTheme,
   InputAdornment,
   Stack,
-  Popover,
+  // Popover,
   Switch,
   Tooltip,
 } from '@mui/material';
@@ -37,31 +37,32 @@ import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import debounce from 'lodash/debounce';
 import SearchIcon from '@mui/icons-material/Search';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import CloseIcon from '@mui/icons-material/Close';
+// import FilterListIcon from '@mui/icons-material/FilterList';
+// import CloseIcon from '@mui/icons-material/Close';
 import PeopleIcon from '@mui/icons-material/People';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
+// import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+// import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PsychologyAltOutlinedIcon from '@mui/icons-material/PsychologyAltOutlined';
-import StarBorderOutlinedIcon from '@mui/icons-material/StarBorderOutlined';
+// import StarBorderOutlinedIcon from '@mui/icons-material/StarBorderOutlined';
 import SortIcon from '@mui/icons-material/Sort';
 import GameDetails from './GameDetails';
 import GameCard from './GameCard';
 import ConstructionIcon from '@mui/icons-material/Construction';
 import CategoryIcon from '@mui/icons-material/Category';
 import LikedGamesDialog from './LikedGamesDialog';
+import AuthContext from '../context/AuthContext';
 
 // Helper function to decode HTML entities and preserve line breaks
-const decodeHtmlEntities = (text) => {
-  if (!text) return '';
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = text;
-  return textarea.value
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/&#10;/g, '\n')
-    .replace(/&#13;/g, '\n')
-    .replace(/&nbsp;/g, ' ');
-};
+// const decodeHtmlEntities = (text) => {
+//   if (!text) return '';
+//   const textarea = document.createElement('textarea');
+//   textarea.innerHTML = text;
+//   return textarea.value
+//     .replace(/<br\s*\/?>/gi, '\n')
+//     .replace(/&#10;/g, '\n')
+//     .replace(/&#13;/g, '\n')
+//     .replace(/&nbsp;/g, ' ');
+// };
 
 // Sort options for the game list
 const sortOptions = [
@@ -79,10 +80,10 @@ const sortOptions = [
 ];
 
 // Helper function to get rank label
-const getRankLabel = (sortValue) => {
-  const option = sortOptions.find(opt => opt.value === sortValue);
-  return option ? option.label : 'Rank';
-};
+// const getRankLabel = (sortValue) => {
+//   const option = sortOptions.find(opt => opt.value === sortValue);
+//   return option ? option.label : 'Rank';
+// };
 
 // Generate player count options (1-12)
 const playerCountOptions = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -100,8 +101,8 @@ const GameCardSkeleton = memo(() => (
 ));
 
 const GameList = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  // const theme = useTheme();
+  // const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [searchParams, setSearchParams] = useSearchParams();
   const [inputValue, setInputValue] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -121,6 +122,8 @@ const GameList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const gamesPerPage = 24;
   const [activeFilter, setActiveFilter] = useState(null);
+
+  const { user } = useContext(AuthContext);
 
   const [likedGames, setLikedGames] = useState([]);
   const [dislikedGames, setDislikedGames] = useState([]);
@@ -332,7 +335,7 @@ const GameList = () => {
     }
   }, [isRecommendation, paxOnly, allRecommendations, paxRecommendations]);
 
-  const { games = [], total = 0 } = response || { games: [], total: 0 };
+  // const { games = [], total = 0 } = response || { games: [], total: 0 };
 
   const isSortFiltered = sortBy !== 'rank';
   const sortButtonLabel = isSortFiltered ? (sortOptions.find(opt => opt.value === sortBy)?.label || 'Sort') : 'Sort';
@@ -736,18 +739,21 @@ const GameList = () => {
                   </Button>
                 </Tooltip>
               ) : (
-                <Tooltip title="Get recommendations based on liked/disliked games">
-                  <Button
+                <Tooltip title={user ? "Get recommendations based on your liked/disliked games" : "You must be logged in to get recommendations"}>
+                  <span>
+                    <Button
+                      onClick={handleRecommend}
                       variant="contained"
                       color="primary"
-                      onClick={handleRecommend}
-                      disabled={likedGames.length === 0 && dislikedGames.length === 0}
-                  >
+                      disabled={!user || (likedGames.length === 0 && dislikedGames.length === 0)}
+                      // startIcon={<PsychologyAltOutlinedIcon />}
+                    >
                       Recommend Games
-                  </Button>
+                    </Button>
+                  </span>
                 </Tooltip>
               )}
-              <Tooltip title="View and manage your liked and disliked games">
+              <Tooltip title="View your liked/disliked games">
                 <Button
                     onClick={() => setIsLikedGamesDialogOpen(true)}
                     size="small"
@@ -783,11 +789,11 @@ const GameList = () => {
             game={selectedGame}
             open={detailsOpen}
             onClose={() => setDetailsOpen(false)}
-            onFilter={handleFilter}
-            likedGames={likedGames}
-            dislikedGames={dislikedGames}
             onLike={handleLikeGame}
             onDislike={handleDislikeGame}
+            likedGames={likedGames}
+            dislikedGames={dislikedGames}
+            onFilter={handleFilter}
           />
         )}
       </Container>

@@ -30,6 +30,9 @@ alembic = "^1.16.1"
 httpx = "^0.28.1"
 tqdm = "^4.67.1"
 rapidfuzz = "^3.13.0"
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+python-jose = "^3.5.0"
+python-multipart = "^0.0.20"
 
 
 [build-system]

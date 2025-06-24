@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, select
 from sqlalchemy.sql import or_, and_
-from . import models, schemas
+from . import models, schemas, security
 from typing import List, Optional
 import logging
 
@@ -323,11 +323,11 @@ def get_mechanics_by_frequency(db: Session):
 
 def get_categories_by_frequency(db: Session):
     return db.query(
-        models.Category.boardgamecategory_id, 
-        models.Category.boardgamecategory_name, 
+        models.Category.boardgamecategory_id,
+        models.Category.boardgamecategory_name,
         func.count(models.Category.boardgamecategory_id).label('frequency')
     ).group_by(
-        models.Category.boardgamecategory_id, 
+        models.Category.boardgamecategory_id,
         models.Category.boardgamecategory_name
     ).order_by(
         func.count(models.Category.boardgamecategory_id).desc()
@@ -431,3 +431,29 @@ def get_pax_games_with_board_game_links(db: Session, skip: int = 0, limit: int =
     pax_games = query.offset(skip).limit(limit).all()
     
     return pax_games, total
+
+def get_user(db: Session, user_id: int):
+    return db.query(models.User).filter(models.User.id == user_id).first()
+
+def get_user_by_username(db: Session, username: str):
+    return db.query(models.User).filter(models.User.username == username).first()
+
+def create_user(db: Session, user: schemas.UserCreate):
+    hashed_password = security.get_password_hash(user.password)
+    db_user = models.User(
+        username=user.username,
+        hashed_password=hashed_password,
+        is_admin=user.is_admin if hasattr(user, 'is_admin') else False
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+def authenticate_user(db: Session, username: str, password: str):
+    user = get_user_by_username(db, username)
+    if not user:
+        return False
+    if not security.verify_password(password, user.hashed_password):
+        return False
+    return user
