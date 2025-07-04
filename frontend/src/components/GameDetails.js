@@ -149,6 +149,7 @@ const GameDetails = ({ game, open, onClose, onFilter, likedGames, dislikedGames,
               game={rec}
               onClick={() => handleRecommendationClick(rec)}
               sortBy="rank"
+              compact={true}
             />
           </Grid>
         ))}

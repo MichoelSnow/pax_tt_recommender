@@ -52,7 +52,7 @@ const useProgressiveImage = (localSrc, remoteSrc, placeholder) => {
     return src;
   };
 
-const GameCard = memo(({ game, onClick, sortBy, liked, disliked, onLike, onDislike }) => {
+const GameCard = memo(({ game, onClick, sortBy, liked, disliked, onLike, onDislike, compact = false }) => {
   const [bgColor, setBgColor] = useState('#f5f5f5');
   const localImage = game.image ? `http://localhost:8000/images/${game.image.split('/').pop()}` : null;
   const remoteImage = game.image ? `http://localhost:8000/proxy-image/${encodeURIComponent(game.image)}` : null;
@@ -168,7 +168,9 @@ const GameCard = memo(({ game, onClick, sortBy, liked, disliked, onLike, onDisli
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <PeopleIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
                 <Typography variant="body2" color="text.secondary">
-                  {game.min_players === game.max_players ? game.min_players : `${game.min_players} - ${game.max_players}`} players
+                  {game.min_players === game.max_players
+                    ? (compact ? game.min_players : `${game.min_players} players`)
+                    : (compact ? `${game.min_players} - ${game.max_players}` : `${game.min_players} - ${game.max_players} players`)}
                 </Typography>
               </Box>
             </Tooltip>
@@ -176,7 +178,9 @@ const GameCard = memo(({ game, onClick, sortBy, liked, disliked, onLike, onDisli
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <AccessTimeIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
                 <Typography variant="body2" color="text.secondary">
-                  {game.min_playtime === game.max_playtime ? `${game.min_playtime} min` : `${game.min_playtime} - ${game.max_playtime} min`}
+                  {game.min_playtime === game.max_playtime
+                    ? (compact ? game.min_playtime : `${game.min_playtime} min`)
+                    : (compact ? `${game.min_playtime} - ${game.max_playtime}` : `${game.min_playtime} - ${game.max_playtime} min`)}
                 </Typography>
               </Box>
             </Tooltip>
