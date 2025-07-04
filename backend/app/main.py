@@ -11,7 +11,7 @@ import httpx
 from sqlalchemy.orm import Session
 from pathlib import Path
 from . import crud, models, schemas, recommender, security
-from .database import engine, SessionLocal
+from .database import engine, SessionLocal, CORSAwareStaticFiles
 import time
 from functools import lru_cache
 import asyncio
@@ -51,7 +51,7 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Mount the images directory
-app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
+app.mount("/images", CORSAwareStaticFiles(directory=str(IMAGES_DIR)), name="images")
 
 # Dependency to get database session
 def get_db():

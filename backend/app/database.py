@@ -3,6 +3,8 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.pool import QueuePool
 import logging
 from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
 
 logger = logging.getLogger(__name__)
 
@@ -47,3 +49,10 @@ def get_db():
         yield db
     finally:
         db.close()
+
+class CORSAwareStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        response: Response = await super().get_response(path, scope)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        # Optionally, add other headers as needed
+        return response
