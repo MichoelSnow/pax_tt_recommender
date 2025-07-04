@@ -5,15 +5,17 @@ import logging
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
+import os
 
 logger = logging.getLogger(__name__)
 
 # Get the backend directory path
 backend_dir = Path(__file__).parent.parent
-database_path = backend_dir / "database" / "boardgames.db"
+# database_path = backend_dir / "database" / "boardgames.db"
+DATABASE_PATH = os.getenv("DATABASE_PATH", str(Path(__file__).parent.parent / "database" / "boardgames.db"))
 
 # Database URL - use absolute path
-SQLALCHEMY_DATABASE_URL = f"sqlite:///{database_path}"
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 # Create engine with optimized settings
 engine = create_engine(

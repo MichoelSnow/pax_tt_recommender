@@ -8,6 +8,7 @@ import numpy as np
 from scipy import sparse
 from sklearn.preprocessing import normalize
 import json
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +30,11 @@ class ModelManager:
         if self._game_embeddings is not None:
             return self._game_embeddings
 
-        # Find the most recent embeddings file
-        database_dir = Path(__file__).parent.parent / "database"
+        # Use environment variable for database directory in production
+        database_dir = Path(os.getenv("DATABASE_DIR", str(Path(__file__).parent.parent / "database")))
         game_embeddings_files = list(database_dir.glob("game_embeddings_*.npz"))
         reverse_mappings_files = list(database_dir.glob("reverse_mappings_*.json"))
+        
         if not game_embeddings_files:
             raise FileNotFoundError("No embeddings files found")
 

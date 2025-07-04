@@ -50,3 +50,9 @@ frontend/.vite/
 # data
 data/
 
+# Production
+frontend/build/
+fly.toml
+
+# Scratch
+cursor_plans.MD
