@@ -102,6 +102,7 @@ const GameList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const gamesPerPage = 24;
   const [activeFilter, setActiveFilter] = useState(null);
+  const [isRecommendationLoading, setIsRecommendationLoading] = useState(false);
 
   const { user } = useContext(AuthContext);
 
@@ -145,6 +146,7 @@ const GameList = () => {
 
   const handleRecommend = async () => {
     try {
+      setIsRecommendationLoading(true);
       const recommendationPayload = {
         liked_games: likedGames.map(g => g.id),
         disliked_games: dislikedGames.map(g => g.id),
@@ -161,6 +163,8 @@ const GameList = () => {
       setActiveFilter(null);
     } catch (err) {
       console.error('Failed to fetch recommendations:', err);
+    } finally {
+      setIsRecommendationLoading(false);
     }
   };
 
@@ -730,7 +734,7 @@ const GameList = () => {
                       onClick={handleRecommend}
                       variant="contained"
                       color="primary"
-                      disabled={!user || (likedGames.length === 0 && dislikedGames.length === 0)}
+                      disabled={!user || (likedGames.length === 0 && dislikedGames.length === 0) || isRecommendationLoading}
                     >
                       Recommend Games
                     </Button>
@@ -755,6 +759,15 @@ const GameList = () => {
           </Box>
         )}
         
+        {isRecommendationLoading && (
+          <Box sx={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', bgcolor: 'rgba(255,255,255,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Stack spacing={2} alignItems="center">
+              <CircularProgress size={64} />
+              <Typography variant="h6">Generating recommendations...</Typography>
+            </Stack>
+          </Box>
+        )}
+
         {renderGameGrid()}
 
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
