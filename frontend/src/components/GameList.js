@@ -9,26 +9,13 @@ import {
   Box,
   Alert,
   Button,
-  // FormControl,
-  // InputLabel,
-  // Select,
-  // MenuItem,
-  // FormGroup,
   FormControlLabel,
-  // Checkbox,
-  // Divider,
-  // Autocomplete,
-  // CardMedia,
   CircularProgress,
-  // IconButton,
   Chip,
   Skeleton,
   Pagination,
-  // useMediaQuery,
-  // useTheme,
   InputAdornment,
   Stack,
-  // Popover,
   Switch,
   Tooltip,
 } from '@mui/material';
@@ -37,13 +24,8 @@ import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import debounce from 'lodash/debounce';
 import SearchIcon from '@mui/icons-material/Search';
-// import FilterListIcon from '@mui/icons-material/FilterList';
-// import CloseIcon from '@mui/icons-material/Close';
 import PeopleIcon from '@mui/icons-material/People';
-// import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-// import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PsychologyAltOutlinedIcon from '@mui/icons-material/PsychologyAltOutlined';
-// import StarBorderOutlinedIcon from '@mui/icons-material/StarBorderOutlined';
 import SortIcon from '@mui/icons-material/Sort';
 import GameDetails from './GameDetails';
 import GameCard from './GameCard';
@@ -101,8 +83,6 @@ const GameCardSkeleton = memo(() => (
 ));
 
 const GameList = () => {
-  // const theme = useTheme();
-  // const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [searchParams, setSearchParams] = useSearchParams();
   const [inputValue, setInputValue] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -132,7 +112,7 @@ const GameList = () => {
   const [totalGames, setTotalGames] = useState(0);
   const [isRecommendation, setIsRecommendation] = useState(false);
   const [allRecommendations, setAllRecommendations] = useState([]);
-  const [paxRecommendations, setPaxRecommendations] = useState([]);
+  const [paxGameIds, setPaxGameIds] = useState([]); // Store PAX game IDs for filtering
   const [paxOnly, setPaxOnly] = useState(false);
 
   const handleLikeGame = (game) => {
@@ -168,23 +148,13 @@ const GameList = () => {
       const recommendationPayload = {
         liked_games: likedGames.map(g => g.id),
         disliked_games: dislikedGames.map(g => g.id),
-        limit: 100,
+        limit: 200, // Large number for client-side filtering
       };
-
-      const [allResponse, paxResponse] = await Promise.all([
-        axios.post('http://localhost:8000/recommendations', {
-          ...recommendationPayload,
-          pax_only: false
-        }),
-        axios.post('http://localhost:8000/recommendations', {
-          ...recommendationPayload,
-          pax_only: true
-        })
-      ]);
-
+      const allResponse = await axios.post('http://localhost:8000/recommendations', {
+        ...recommendationPayload,
+        pax_only: false
+      });
       setAllRecommendations(allResponse.data);
-      setPaxRecommendations(paxResponse.data);
-
       setCurrentPage(1);
       setIsRecommendation(true);
       setSortBy('recommendation_score');
@@ -326,16 +296,31 @@ const GameList = () => {
     }
   }, [response, isRecommendation]);
 
+  // Fetch PAX game IDs once on mount
+  useEffect(() => {
+    const fetchPaxGameIds = async () => {
+      try {
+        const response = await axios.get('http://localhost:8000/pax_game_ids');
+        setPaxGameIds(response.data); // Should be an array of IDs
+      } catch (err) {
+        console.error('Failed to fetch PAX game IDs:', err);
+      }
+    };
+    fetchPaxGameIds();
+  }, []);
+
   useEffect(() => {
     if (isRecommendation) {
-      const newGameList = paxOnly ? paxRecommendations : allRecommendations;
+      let newGameList = allRecommendations;
+      if (paxOnly && paxGameIds.length > 0) {
+        const paxSet = new Set(paxGameIds);
+        newGameList = allRecommendations.filter(game => paxSet.has(game.id));
+      }
       setGameList(newGameList);
       setTotalGames(newGameList.length);
       setCurrentPage(1);
     }
-  }, [isRecommendation, paxOnly, allRecommendations, paxRecommendations]);
-
-  // const { games = [], total = 0 } = response || { games: [], total: 0 };
+  }, [isRecommendation, paxOnly, allRecommendations, paxGameIds]);
 
   const isSortFiltered = sortBy !== 'rank';
   const sortButtonLabel = isSortFiltered ? (sortOptions.find(opt => opt.value === sortBy)?.label || 'Sort') : 'Sort';
@@ -746,7 +731,6 @@ const GameList = () => {
                       variant="contained"
                       color="primary"
                       disabled={!user || (likedGames.length === 0 && dislikedGames.length === 0)}
-                      // startIcon={<PsychologyAltOutlinedIcon />}
                     >
                       Recommend Games
                     </Button>

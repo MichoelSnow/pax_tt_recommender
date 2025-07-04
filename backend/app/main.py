@@ -20,6 +20,7 @@ from datetime import timedelta
 # import os
 # import sys
 from pathlib import Path
+from fastapi import APIRouter
 
 # Configure logging
 logging.basicConfig(
@@ -326,6 +327,13 @@ def read_categories(db: Session = Depends(get_db)):
     categories = crud.get_categories_cached(db)
     return categories
 
+@app.get("/pax_game_ids", response_model=List[int])
+async def get_pax_game_ids(db: Session = Depends(get_db)):
+    """Return a list of all PAX game BGG IDs (integers)."""
+    pax_ids = db.query(models.PAXGame.bgg_id).filter(models.PAXGame.bgg_id.isnot(None)).all()
+    # pax_ids is a list of tuples, extract the first element from each
+    return [pid[0] for pid in pax_ids if pid[0] is not None]
+
 @app.on_event("startup")
 async def startup_event():
     """Load the recommender model on startup."""
@@ -342,12 +350,11 @@ class RecommendationRequest(schemas.BaseModel):
 @app.post("/recommendations", response_model=List[schemas.BoardGameOut])
 async def get_multi_game_recommendations(
     request: RecommendationRequest,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(security.get_current_active_user)
+    db: Session = Depends(get_db)
 ):
     """
     Get game recommendations based on a list of liked and disliked games.
-    Requires authentication.
+    No authentication required beyond being able to access the site.
     """
     try:
         recommendations = crud.get_recommendations(
