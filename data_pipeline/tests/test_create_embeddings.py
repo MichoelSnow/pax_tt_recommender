@@ -5,6 +5,7 @@ import pytest
 
 from data_pipeline.src.features.create_embeddings import (
     GameRecommender,
+    load_sparse_ratings_from_duckdb,
     load_wide_ratings_from_duckdb,
     resolve_embeddings_output_dir,
 )
@@ -105,6 +106,40 @@ def test_load_wide_ratings_from_duckdb_raises_if_table_missing(tmp_path):
     con.close()
     with pytest.raises(ValueError, match="boardgame_ratings"):
         load_wide_ratings_from_duckdb(db_path)
+
+
+def test_load_sparse_ratings_from_duckdb_filters_users_and_preserves_values(tmp_path):
+    db_path = tmp_path / "ratings.duckdb"
+    con = duckdb.connect(str(db_path))
+    try:
+        con.execute(
+            """
+            CREATE TABLE boardgame_ratings (
+                game_id BIGINT,
+                rating_round DOUBLE,
+                username TEXT
+            )
+            """
+        )
+        con.execute(
+            """
+            INSERT INTO boardgame_ratings VALUES
+            (10, 8.0, 'u1'), (20, 7.0, 'u1'),
+            (10, 9.0, 'u2'), (30, 6.0, 'u3')
+            """
+        )
+    finally:
+        con.close()
+
+    matrix, users, games, reverse_games = load_sparse_ratings_from_duckdb(
+        db_path, min_ratings_per_user=2
+    )
+
+    assert matrix.shape == (3, 1)
+    assert matrix.toarray().tolist() == [[8.0], [7.0], [0.0]]
+    assert users == {"u1": 0}
+    assert games == {10: 0, 20: 1, 30: 2}
+    assert reverse_games == {0: 10, 1: 20, 2: 30}
 
 
 def test_resolve_embeddings_output_dir_points_to_repo_backend_database():
