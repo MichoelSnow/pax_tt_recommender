@@ -62,9 +62,7 @@ def test_stage_prerequisites():
         )
 
     state["stages"]["get_ranks"]["status"] = "completed"
-    run_ingest_pipeline._validate_stage_prerequisite(
-        state, stage_name="get_game_data"
-    )
+    run_ingest_pipeline._validate_stage_prerequisite(state, stage_name="get_game_data")
 
 
 def test_only_stage_updates_only_requested_stage(tmp_path, monkeypatch):

@@ -214,9 +214,7 @@ def _run_game_data_ingest(
             games_xml_list = soup_xml.find_all(
                 "item", attrs={"type": ["boardgame", "boardgameexpansion"]}
             )
-            returned_game_ids = {
-                int(game_xml["id"]) for game_xml in games_xml_list
-            }
+            returned_game_ids = {int(game_xml["id"]) for game_xml in games_xml_list}
             missing_game_ids = [
                 game_id for game_id in batch_ids if game_id not in returned_game_ids
             ]

@@ -164,9 +164,7 @@ def _next_incomplete_stage(state: dict[str, Any], stages: list[Stage]) -> Stage 
     return None
 
 
-def _validate_stage_prerequisite(
-    state: dict[str, Any], *, stage_name: str
-) -> None:
+def _validate_stage_prerequisite(state: dict[str, Any], *, stage_name: str) -> None:
     prerequisite = STAGE_PREREQUISITES.get(stage_name)
     if prerequisite is None:
         return
@@ -178,14 +176,10 @@ def _validate_stage_prerequisite(
         )
 
 
-def _should_start_new_run(
-    existing_state: dict[str, Any], *, reset_state: bool
-) -> bool:
+def _should_start_new_run(existing_state: dict[str, Any], *, reset_state: bool) -> bool:
     """Start fresh after completion, but resume an interrupted run by default."""
     return (
-        reset_state
-        or not existing_state
-        or existing_state.get("status") == "completed"
+        reset_state or not existing_state or existing_state.get("status") == "completed"
     )
 
 
@@ -439,8 +433,10 @@ def main() -> int:
         existing_state = _build_initial_state(
             include_ratings=True, run_log_path=str(run_log_path)
         )
-    start_new_run = False if args.only_stage else _should_start_new_run(
-        existing_state, reset_state=args.reset_state
+    start_new_run = (
+        False
+        if args.only_stage
+        else _should_start_new_run(existing_state, reset_state=args.reset_state)
     )
     selected_stages = _selected_stages(
         include_ratings=include_ratings,
@@ -487,7 +483,9 @@ def main() -> int:
                 _notify(event="completed", state=state)
                 logger.info("Ingest pipeline completed successfully.")
             else:
-                _notify(event="stage_completed", state=state, stage_name=args.only_stage)
+                _notify(
+                    event="stage_completed", state=state, stage_name=args.only_stage
+                )
                 logger.info("Requested stage completed successfully.")
             return 0
 
@@ -517,9 +515,7 @@ def main() -> int:
             logger.info("Stage %s completed.", stage.name)
             if stage.name == "get_game_data":
                 _cleanup_superseded_ingest_artifacts(
-                    Path(__file__).resolve().parents[2]
-                    / "data"
-                    / "ingest"
+                    Path(__file__).resolve().parents[2] / "data" / "ingest"
                 )
             continue
 
