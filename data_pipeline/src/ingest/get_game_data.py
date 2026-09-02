@@ -48,6 +48,7 @@ logger = logging.getLogger(__name__)
 
 BATCH_REQUEST_TIMEOUT_SECONDS = 20
 BGG_TOKEN_ENV_VAR = "BGG_TOKEN"
+MAX_SKIPPED_GAME_IDS = 100
 
 
 def _get_bgg_token() -> str:
@@ -183,6 +184,7 @@ def _run_game_data_ingest(
             if int(game_id) not in completed_ids
         ]
         logger.info("Found %d new boardgames to process", len(boardgame_ids))
+        skipped_game_ids: list[int] = []
 
         total_batches = (
             math.ceil(len(boardgame_ids) / batch_size) if boardgame_ids else 0
@@ -212,9 +214,20 @@ def _run_game_data_ingest(
             games_xml_list = soup_xml.find_all(
                 "item", attrs={"type": ["boardgame", "boardgameexpansion"]}
             )
-            if len(games_xml_list) == 0:
-                raise RuntimeError(
-                    f"BGG API returned zero items for batch URL: {bg_info_url}"
+            returned_game_ids = {
+                int(game_xml["id"]) for game_xml in games_xml_list
+            }
+            missing_game_ids = [
+                game_id for game_id in batch_ids if game_id not in returned_game_ids
+            ]
+            if missing_game_ids:
+                skipped_game_ids.extend(missing_game_ids)
+                logger.warning(
+                    "BGG returned no game data for %d ID(s): %s (skipped=%d/%d)",
+                    len(missing_game_ids),
+                    missing_game_ids,
+                    len(skipped_game_ids),
+                    MAX_SKIPPED_GAME_IDS,
                 )
 
             batch_game_dicts = []
@@ -233,9 +246,25 @@ def _run_game_data_ingest(
             _upsert_game_batch(conn, batch_game_dicts)
             if batch_saves and (batch_num + 1) % save_every_n_batches == 0:
                 logger.info("Checkpointed batch %d to %s", batch_num + 1, save_path)
+            if len(skipped_game_ids) >= MAX_SKIPPED_GAME_IDS:
+                raise RuntimeError(
+                    "Skipped %d game IDs because BGG returned no records; "
+                    "aborting after reaching the limit of %d. IDs: %s"
+                    % (
+                        len(skipped_game_ids),
+                        MAX_SKIPPED_GAME_IDS,
+                        skipped_game_ids,
+                    )
+                )
             sleep(1)
 
         boardgame_df = _load_game_data_from_store(conn)
+        if skipped_game_ids:
+            logger.warning(
+                "Completed game-data ingest with %d skipped game ID(s): %s",
+                len(skipped_game_ids),
+                skipped_game_ids,
+            )
         logger.info("Successfully completed fetching all boardgame data")
         logger.info("Saved final data to %s", save_path)
         return boardgame_df
