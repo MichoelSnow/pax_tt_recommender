@@ -32,3 +32,7 @@
 ## MCPs
   - Only use the Context7 MCP when I explicitly ask for it
   - 
+
+## Collaboration preferences
+ - Assume the user has already verified that the environment is ready and that prior tests and processes are in a good state.
+ - Do not repeat reminders to wait for processes, rerun tests, or confirm readiness unless a new, specific risk makes the reminder necessary.

@@ -175,5 +175,5 @@ Admin kiosk enrollment flow:
 - Avoid `fly scale count 0` as a routine stop/start mechanism; it can force machine/volume recreation work.
 
 ## Reference
-- Fast command index: [docs/core/command_reference.md](/docs/core/command_reference.md)
-- Convention-specific operations: [docs/core/convention_ops.md](/docs/core/convention_ops.md)
+- Fast command index: [command_reference.md](command_reference.md)
+- Convention-specific operations: [convention_ops.md](convention_ops.md)

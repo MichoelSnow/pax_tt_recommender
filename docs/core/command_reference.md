@@ -36,8 +36,8 @@ poetry run alembic upgrade head
 ```
 
 Data pipeline and import workflow details:
-- [data_pipeline/README.md](/data_pipeline/README.md)
-- [backend/README.md](/backend/README.md)
+- [data_pipeline/README.md](../../data_pipeline/README.md)
+- [backend/README.md](../../backend/README.md)
 
 
 ## 2. Fly Stack Lifecycle

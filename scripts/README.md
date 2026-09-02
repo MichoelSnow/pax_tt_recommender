@@ -1,6 +1,12 @@
 # Scripts Guide
 
-This directory is organized by operational task, not by individual script history.
+This is a command index, not a step-by-step workflow. Start with the
+[documentation index](../docs/README.md) when you need to decide which process
+to run. Use the links below for command-specific details.
+
+The commands in a subsection are examples or alternatives unless a workflow
+explicitly says they are required. In particular, the dedicated ingest worker
+commands are separate from the application stack commands.
 
 ## Directory Layout
 - `scripts/deploy/`
@@ -46,13 +52,26 @@ scripts/deploy/fly_stack.sh prod down
 scripts/deploy/fly_stack.sh prod status
 ```
 
-### 2a) Deploy/Run Dedicated Ingest Worker
+### 2a) Operate Dedicated Ingest Worker
+
+Use this for BoardGameGeek data collection on the separate `bg-lib-ingest` Fly
+machine. It is not needed for ordinary application deployment or for importing
+already-processed data.
+
 ```bash
-scripts/deploy/fly_ingest_deploy.sh
-scripts/deploy/fly_ingest_set_secrets.sh
-scripts/deploy/fly_ingest_start.sh
-scripts/deploy/fly_ingest_status.sh
+scripts/ingest/fly_ingest.sh deploy
+scripts/ingest/fly_ingest.sh secrets sync
+scripts/ingest/fly_ingest.sh maintenance start
+scripts/ingest/fly_ingest.sh maintenance stop
+scripts/ingest/fly_ingest.sh run ranks
+scripts/ingest/fly_ingest.sh run game-data
+scripts/ingest/fly_ingest.sh run ratings
+scripts/ingest/fly_ingest.sh run fresh
+scripts/ingest/fly_ingest.sh machine status
 ```
+
+See [ingest/README.md](ingest/README.md) for the workflow and for which of
+these commands are conditional.
 
 ### 3) Validate Dev Deploy
 ```bash
