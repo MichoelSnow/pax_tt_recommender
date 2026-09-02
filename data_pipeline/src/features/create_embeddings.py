@@ -165,6 +165,21 @@ class GameRecommender:
         # Compute game similarity matrix
         self.game_embeddings = normalize(self.rating_matrix.T, norm="l2", axis=1)
 
+    def fit_from_duckdb(self, ratings_duckdb_path: Path) -> None:
+        """Fit directly from DuckDB without building a wide DataFrame."""
+        (
+            game_matrix,
+            self.user_mapping,
+            self.game_mapping,
+            self.reverse_game_mapping,
+        ) = load_sparse_ratings_from_duckdb(
+            ratings_duckdb_path,
+            min_ratings_per_user=self.min_ratings_per_user,
+        )
+        self.game_embeddings = normalize(game_matrix, norm="l2", axis=1, copy=False)
+        # Keep the historical user-by-game attribute without copying the data.
+        self.rating_matrix = self.game_embeddings.T
+
     # def recommend_similar_games(
     #     self,
     #     game_ids: List[str],
@@ -262,6 +277,115 @@ def load_wide_ratings_from_duckdb(ratings_duckdb_path: Path) -> pd.DataFrame:
     return df_wide
 
 
+def load_sparse_ratings_from_duckdb(
+    ratings_duckdb_path: Path, *, min_ratings_per_user: int = 3
+) -> tuple[sparse.csr_matrix, dict[str, int], dict[int, int], dict[int, int]]:
+    """Load ratings as a game-by-user CSR matrix using bounded streaming.
+
+    User and game IDs are assigned in DuckDB. A first query computes the CSR
+    row sizes; a second query streams the ratings into preallocated CSR arrays.
+    This avoids the wide Pandas representation, COO arrays, and global result
+    sorting used by the legacy path.
+    """
+    if min_ratings_per_user < 1:
+        raise ValueError("min_ratings_per_user must be positive")
+
+    connection = duckdb.connect(str(ratings_duckdb_path), read_only=True)
+    try:
+        table_names = {row[0] for row in connection.execute("SHOW TABLES").fetchall()}
+        if "boardgame_ratings" not in table_names:
+            raise ValueError(
+                f"Table 'boardgame_ratings' not found in {ratings_duckdb_path}"
+            )
+
+        connection.execute("SET threads = 1")
+        connection.execute("SET preserve_insertion_order = false")
+
+        user_rows = connection.execute(
+            """
+            SELECT username, count(*) AS rating_count,
+                   row_number() OVER (ORDER BY username) - 1 AS user_idx
+            FROM boardgame_ratings
+            GROUP BY username
+            HAVING count(*) >= ?
+            ORDER BY user_idx
+            """,
+            [min_ratings_per_user],
+        ).fetchall()
+        game_rows = connection.execute(
+            """
+            WITH eligible_users AS (
+                SELECT username
+                FROM boardgame_ratings
+                GROUP BY username
+                HAVING count(*) >= ?
+            )
+            SELECT games.game_id,
+                   count(eligible.username) AS rating_count,
+                   row_number() OVER (ORDER BY games.game_id) - 1 AS game_idx
+            FROM (SELECT DISTINCT game_id FROM boardgame_ratings) AS games
+            LEFT JOIN boardgame_ratings AS ratings
+                ON ratings.game_id = games.game_id
+            LEFT JOIN eligible_users AS eligible
+                ON eligible.username = ratings.username
+            GROUP BY games.game_id
+            ORDER BY game_idx
+            """,
+            [min_ratings_per_user],
+        ).fetchall()
+
+        user_mapping = {str(row[0]): int(row[2]) for row in user_rows}
+        game_mapping = {int(row[0]): int(row[2]) for row in game_rows}
+        reverse_game_mapping = {
+            index: game_id for game_id, index in game_mapping.items()
+        }
+        game_counts = np.zeros(len(game_rows), dtype=np.int64)
+        for _, rating_count, game_idx in game_rows:
+            game_counts[int(game_idx)] = int(rating_count)
+        indptr = np.empty(len(game_counts) + 1, dtype=np.int64)
+        indptr[0] = 0
+        np.cumsum(game_counts, out=indptr[1:])
+
+        # Build game-by-user CSR directly. The streamed rows need not be sorted:
+        # each user's next available position is tracked independently.
+        indices = np.empty(int(indptr[-1]), dtype=np.int32)
+        data = np.empty(int(indptr[-1]), dtype=np.float32)
+        next_positions = indptr[:-1].copy()
+        ratings_query = connection.cursor()
+        ratings_query.execute(
+            """
+            WITH eligible_users AS (
+                SELECT username, row_number() OVER (ORDER BY username) - 1 AS user_idx
+                FROM boardgame_ratings
+                GROUP BY username
+                HAVING count(*) >= ?
+            ), game_mapping AS (
+                SELECT game_id, row_number() OVER (ORDER BY game_id) - 1 AS game_idx
+                FROM (SELECT DISTINCT game_id FROM boardgame_ratings)
+            )
+            SELECT g.game_idx, u.user_idx, r.rating_round
+            FROM boardgame_ratings AS r
+            INNER JOIN eligible_users AS u ON u.username = r.username
+            INNER JOIN game_mapping AS g ON g.game_id = r.game_id
+            """,
+            [min_ratings_per_user],
+        )
+        while batch := ratings_query.fetchmany(100_000):
+            for game_idx, user_idx, rating in batch:
+                position = next_positions[int(game_idx)]
+                indices[position] = int(user_idx)
+                data[position] = float(rating)
+                next_positions[int(game_idx)] += 1
+    finally:
+        connection.close()
+
+    matrix = sparse.csr_matrix(
+        (data, indices, indptr),
+        shape=(len(game_mapping), len(user_mapping)),
+    )
+    return matrix, user_mapping, game_mapping, reverse_game_mapping
+
+
 def main():
     """Main function to train and save the recommender model."""
     try:
@@ -292,9 +416,6 @@ def main():
         latest_ratings = max(ratings_files, key=lambda x: x.stat().st_mtime)
         logger.info(f"Using ratings file: {latest_ratings}")
 
-        # Read ratings data (DuckDB long format -> wide format)
-        df_ratings = load_wide_ratings_from_duckdb(latest_ratings)
-
         # Initialize and train the recommender
         recommender = GameRecommender(
             min_ratings_per_user=args.min_ratings,
@@ -305,7 +426,7 @@ def main():
         if args.exclude_expansions:
             recommender.valid_game_ids = recommender._load_valid_games()
 
-        recommender.fit(df_ratings)
+        recommender.fit_from_duckdb(latest_ratings)
 
         # Get timestamp from ratings file
         timestamp = latest_ratings.stem.split("_")[-1]

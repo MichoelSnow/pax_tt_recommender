@@ -366,10 +366,22 @@ target Fly app environment and does not update a local database.
 Run inside the target app container so app + DB configuration match deploy environment.
 
 Recommended execution order for remote import:
-1. **Required — stage processed data and runtime artifacts** on the target app machine (section below).
-2. **Recommended — back up** the target remote database before a reset/import. Choose one backup option below; do not run both.
-3. **Required — run the import** using the detached import job.
-4. **Optional — import library convention data** if the library should be updated.
+1. **Operations — start the target app and database machines** if they are stopped:
+   ```bash
+   scripts/deploy/fly_stack.sh dev up
+   # or: scripts/deploy/fly_stack.sh prod up
+   ```
+   Use the environment that matches `TARGET_APP`. This starts the machines; it
+   does not deploy new code or run an import.
+2. **Required — stage processed data and runtime artifacts** on the target app machine (section below).
+3. **Recommended — back up** the target remote database before a reset/import. Choose one backup option below; do not run both.
+4. **Required — run the import** using the detached import job.
+5. **Optional — import library convention data** if the library should be updated.
+6. **Optional — stop the target app and database machines** when all remote work is complete and they should not remain running:
+   ```bash
+   scripts/deploy/fly_stack.sh dev down
+   # or: scripts/deploy/fly_stack.sh prod down
+   ```
 
 Do not run the local import commands as part of this path. The reset import is
 destructive and is not required when the remote import procedure is explicitly
