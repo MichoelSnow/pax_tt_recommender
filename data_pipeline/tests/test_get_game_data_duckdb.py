@@ -39,7 +39,7 @@ def test_duckdb_store_upsert_and_reload(tmp_path):
         con.close()
 
 
-def test_get_game_data_raises_if_batch_returns_no_items(tmp_path, monkeypatch):
+def test_get_game_data_skips_ids_when_batch_returns_no_items(tmp_path, monkeypatch):
     class _Response:
         content = b"<items></items>"
 
@@ -52,10 +52,41 @@ def test_get_game_data_raises_if_batch_returns_no_items(tmp_path, monkeypatch):
         lambda _seconds: None,
     )
 
-    ranks_df = pd.DataFrame({"id": [1, 2]})
+    ranks_df = pd.DataFrame({"id": [1]})
     store_path = tmp_path / "boardgame_data_123.duckdb"
 
-    with pytest.raises(RuntimeError, match="BGG API returned zero items for batch URL"):
+    result = get_boardgame_data(
+        boardgame_ranks=ranks_df,
+        existing_store_path=store_path,
+        batch_saves=True,
+        batch_size=20,
+        save_every_n_batches=1,
+    )
+
+    assert result.empty
+
+
+def test_get_game_data_fails_at_skipped_id_limit(tmp_path, monkeypatch):
+    class _Response:
+        content = b"<items></items>"
+
+    monkeypatch.setattr(
+        "data_pipeline.src.ingest.get_game_data._http_get_bgg_xml",
+        lambda _url: _Response(),
+    )
+    monkeypatch.setattr(
+        "data_pipeline.src.ingest.get_game_data.sleep",
+        lambda _seconds: None,
+    )
+    monkeypatch.setattr(
+        "data_pipeline.src.ingest.get_game_data.MAX_SKIPPED_GAME_IDS",
+        1,
+    )
+
+    ranks_df = pd.DataFrame({"id": [1]})
+    store_path = tmp_path / "boardgame_data_123.duckdb"
+
+    with pytest.raises(RuntimeError, match="reaching the limit of 1"):
         get_boardgame_data(
             boardgame_ranks=ranks_df,
             existing_store_path=store_path,

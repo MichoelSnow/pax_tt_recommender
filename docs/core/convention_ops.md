@@ -5,7 +5,7 @@ Operational policy for convention periods where availability and latency are pri
 
 ## Service Targets Reference
 Convention runtime choices should align with:
-- [docs/core/ownership_and_slos.md](/docs/core/ownership_and_slos.md)
+- [ownership_and_slos.md](ownership_and_slos.md)
 
 ## Runtime Profiles
 - `standard`
@@ -108,5 +108,5 @@ Backup path:
 
 ## Related Operations
 For exact commands and operational sequences, use:
-- [docs/core/command_reference.md](/docs/core/command_reference.md)
-- [docs/core/runbook.md](/docs/core/runbook.md)
+- [command_reference.md](command_reference.md)
+- [runbook.md](runbook.md)

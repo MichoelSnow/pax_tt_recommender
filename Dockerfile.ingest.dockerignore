@@ -1,0 +1,13 @@
+# Ingest image allowlist: Dockerfile.ingest copies only these paths.
+# Everything else in the repository is excluded from the ingest build context.
+*
+
+# Dependency manifests
+!pyproject.toml
+!poetry.lock
+
+# Ingest application code
+!data_pipeline/
+!data_pipeline/**
+!scripts/
+!scripts/**

@@ -1,50 +1,45 @@
-# Node modules
+# Shared exclusions for application and ingest builds.
+# Dockerfile-specific exclusions live beside the relevant Dockerfile.
+
+# JavaScript dependencies
 node_modules/
 frontend/node_modules/
 
-# Python cache and virtual environments
+# Python caches and virtual environments
 __pycache__/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 .venv/
 venv/
 
-# Git and VCS
+# Version control and temporary working files
 .git/
+.tmp/
+logs/
 
-# Environment and config files
+# Local secrets and environment overrides
 .env
 .env.*
 .envrc
 
-# Logs
-*.log
-backend/logs/
-crawler/logs/
-
-# Jupyter Notebooks
-.ipynb_checkpoints/
+# Not required in runtime images
 *.ipynb
-
-# Data and database files
-*.db
+.ipynb_checkpoints/
 data/
-backend/database/*.db
+
+# Local database exports and generated backend artifacts
+*.db
 backend/database/*.csv
-backend/database/*.npz
 backend/database/*.json
+backend/database/*.npz
 backend/database/images/*.jpg
 backend/database/images/*.png
 
-# Frontend build and dev artifacts
+# Frontend build outputs (the application Dockerfile builds its own frontend)
 frontend/dist/
 frontend/.vite/
 frontend/build/
 
-# Alembic and migration scratch
-# alembic/ - REMOVED: Need Alembic in production for database migrations
-
-# Production and scratch files
-fly.toml
-cursor_plans.MD
-
-# Miscellaneous
+# Local editor settings
 .vscode/

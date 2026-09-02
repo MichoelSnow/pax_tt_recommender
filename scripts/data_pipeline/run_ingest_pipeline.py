@@ -9,6 +9,7 @@ import logging
 import os
 import smtplib
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -68,6 +69,11 @@ STAGES: tuple[Stage, ...] = (
     ),
 )
 
+STAGE_PREREQUISITES: dict[str, str] = {
+    "get_game_data": "get_ranks",
+    "get_ratings": "get_game_data",
+}
+
 
 def _default_state_path() -> Path:
     state_override = os.getenv("INGEST_RUN_STATE_PATH", "").strip()
@@ -120,8 +126,34 @@ def _save_state(state_path: Path, state: dict[str, Any]) -> None:
         f.write("\n")
 
 
-def _selected_stages(include_ratings: bool) -> list[Stage]:
-    return [stage for stage in STAGES if include_ratings or stage.name != "get_ratings"]
+def _selected_stages(
+    include_ratings: bool,
+    *,
+    continue_game_data: bool = True,
+    only_stage: str | None = None,
+) -> list[Stage]:
+    stages = list(STAGES)
+    if not continue_game_data:
+        game_data_stage = next(
+            stage for stage in stages if stage.name == "get_game_data"
+        )
+        fresh_game_data_command = [
+            argument
+            for argument in game_data_stage.command
+            if argument != "--continue-from-last"
+        ]
+        stages = [
+            Stage(name=stage.name, command=fresh_game_data_command)
+            if stage is game_data_stage
+            else stage
+            for stage in stages
+        ]
+    selected = [
+        stage for stage in stages if include_ratings or stage.name != "get_ratings"
+    ]
+    if only_stage is not None:
+        selected = [stage for stage in selected if stage.name == only_stage]
+    return selected
 
 
 def _next_incomplete_stage(state: dict[str, Any], stages: list[Stage]) -> Stage | None:
@@ -132,12 +164,71 @@ def _next_incomplete_stage(state: dict[str, Any], stages: list[Stage]) -> Stage 
     return None
 
 
-def _stage_can_be_marked_complete_without_run(stage: Stage) -> bool:
-    if stage.name != "get_ranks":
-        return False
-    project_root = Path(__file__).resolve().parents[2]
-    ranks_dir = project_root / "data" / "ingest" / "ranks"
-    return any(ranks_dir.glob("boardgame_ranks_*.csv"))
+def _validate_stage_prerequisite(state: dict[str, Any], *, stage_name: str) -> None:
+    prerequisite = STAGE_PREREQUISITES.get(stage_name)
+    if prerequisite is None:
+        return
+    prerequisite_status = state.get("stages", {}).get(prerequisite, {}).get("status")
+    if prerequisite_status != "completed":
+        raise ValueError(
+            f"{stage_name} requires {prerequisite} to be completed; "
+            f"current status is {prerequisite_status or 'missing'}"
+        )
+
+
+def _should_start_new_run(existing_state: dict[str, Any], *, reset_state: bool) -> bool:
+    """Start fresh after completion, but resume an interrupted run by default."""
+    return (
+        reset_state or not existing_state or existing_state.get("status") == "completed"
+    )
+
+
+def _cleanup_superseded_ingest_artifacts(ingest_dir: Path) -> list[Path]:
+    """Retain only the latest ranks and game-data artifacts."""
+    game_data_dir = ingest_dir / "game_data"
+    ranks_dir = ingest_dir / "ranks"
+    game_data_files = sorted(
+        game_data_dir.glob("boardgame_data_*.duckdb"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    latest_game_data = game_data_files[0] if game_data_files else None
+    removed_files: list[Path] = []
+    files_to_remove = game_data_files[1:]
+    wal_files = list(game_data_dir.glob("boardgame_data_*.duckdb.wal"))
+    if latest_game_data is None:
+        files_to_remove.extend(wal_files)
+    else:
+        files_to_remove.extend(
+            wal_file
+            for wal_file in wal_files
+            if wal_file.name != f"{latest_game_data.name}.wal"
+        )
+    for old_file in files_to_remove:
+        try:
+            old_file.unlink()
+        except OSError:
+            logger.warning("Unable to remove superseded ingest artifact: %s", old_file)
+            continue
+        removed_files.append(old_file)
+        logger.info("Removed superseded ingest artifact: %s", old_file)
+
+    rank_files = sorted(
+        ranks_dir.glob("boardgame_ranks_*.csv"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for old_rank_file in rank_files[1:]:
+        try:
+            old_rank_file.unlink()
+        except OSError:
+            logger.warning(
+                "Unable to remove superseded ingest artifact: %s", old_rank_file
+            )
+            continue
+        removed_files.append(old_rank_file)
+        logger.info("Removed superseded ingest artifact: %s", old_rank_file)
+    return removed_files
 
 
 def _send_email_notification(subject: str, body: str) -> bool:
@@ -239,6 +330,11 @@ def parse_args() -> argparse.Namespace:
         help="Skip get_ratings stage.",
     )
     parser.add_argument(
+        "--only-stage",
+        choices=[stage.name for stage in STAGES],
+        help="Run only the selected stage using the existing run state.",
+    )
+    parser.add_argument(
         "--reset-state",
         action="store_true",
         help="Ignore existing state and start a fresh run state.",
@@ -299,7 +395,7 @@ def _notify_and_reset_max_attempt_stage(
 
     state["status"] = "failed"
     state["failed_at_utc"] = _utc_now_iso()
-    stage_state["status"] = "pending"
+    stage_state["status"] = "failed"
     stage_state["attempts"] = 0
     stage_state["last_error"] = reason
     stage_state["last_failure_notified_at_utc"] = _utc_now_iso()
@@ -307,7 +403,8 @@ def _notify_and_reset_max_attempt_stage(
     _save_state(state_path, state)
     _notify(event="failed_max_attempts", state=state, stage_name=stage_name)
     logger.error(
-        "Stage %s reached max attempts (%d). Alert sent; attempts reset for future runs.",
+        "Stage %s reached max attempts (%d). Alert sent; stage remains failed "
+        "until a later run retries it.",
         stage_name,
         prior_attempts,
     )
@@ -318,21 +415,50 @@ def main() -> int:
     args = parse_args()
     run_log_path = _setup_logging(args.log_dir)
     logger.info("Writing ingest run log to %s", run_log_path)
+    logger.info("Invocation: %s", " ".join([sys.executable, *sys.argv]))
     if _maintenance_mode_enabled():
         return _enter_maintenance_mode()
     if args.max_stage_attempts < 1:
         raise ValueError("--max-stage-attempts must be >= 1")
 
     include_ratings = not args.skip_ratings
-    selected_stages = _selected_stages(include_ratings=include_ratings)
     existing_state = _load_state(args.state_path)
-    if args.reset_state or not existing_state:
+    if args.only_stage and args.reset_state:
+        raise ValueError("--only-stage cannot be combined with --reset-state")
+    if args.only_stage and not existing_state:
+        if args.only_stage != "get_ranks":
+            raise ValueError(
+                f"--only-stage {args.only_stage} requires an existing run state"
+            )
+        existing_state = _build_initial_state(
+            include_ratings=True, run_log_path=str(run_log_path)
+        )
+    start_new_run = (
+        False
+        if args.only_stage
+        else _should_start_new_run(existing_state, reset_state=args.reset_state)
+    )
+    selected_stages = _selected_stages(
+        include_ratings=include_ratings,
+        continue_game_data=not start_new_run,
+        only_stage=args.only_stage,
+    )
+    if start_new_run:
         state = _build_initial_state(
             include_ratings=include_ratings, run_log_path=str(run_log_path)
         )
         _save_state(args.state_path, state)
     else:
         state = existing_state
+        if args.only_stage:
+            _validate_stage_prerequisite(state, stage_name=args.only_stage)
+            stage_state = state["stages"][args.only_stage]
+            stage_state["status"] = "pending"
+            stage_state["attempts"] = 0
+            stage_state["last_error"] = None
+            state["status"] = "running"
+            state["completed_at_utc"] = None
+            state["failed_at_utc"] = None
         state["run_log_path"] = str(run_log_path)
         _save_state(args.state_path, state)
 
@@ -342,11 +468,25 @@ def main() -> int:
     while True:
         stage = _next_incomplete_stage(state, selected_stages)
         if stage is None:
-            state["status"] = "completed"
-            state["completed_at_utc"] = _utc_now_iso()
+            all_stages_completed = all(
+                stage_state.get("status") == "completed"
+                for stage_state in state.get("stages", {}).values()
+            )
+            if all_stages_completed:
+                state["status"] = "completed"
+                state["completed_at_utc"] = _utc_now_iso()
+            elif args.only_stage:
+                state["status"] = "running"
+                state["completed_at_utc"] = None
             _save_state(args.state_path, state)
-            _notify(event="completed", state=state)
-            logger.info("Ingest pipeline completed successfully.")
+            if all_stages_completed:
+                _notify(event="completed", state=state)
+                logger.info("Ingest pipeline completed successfully.")
+            else:
+                _notify(
+                    event="stage_completed", state=state, stage_name=args.only_stage
+                )
+                logger.info("Requested stage completed successfully.")
             return 0
 
         stage_state = state["stages"][stage.name]
@@ -361,18 +501,6 @@ def main() -> int:
                 ),
             )
 
-        if _stage_can_be_marked_complete_without_run(stage):
-            stage_state["status"] = "completed"
-            stage_state["last_error"] = None
-            stage_state["last_attempt_started_at_utc"] = _utc_now_iso()
-            stage_state["last_attempt_finished_at_utc"] = _utc_now_iso()
-            _save_state(args.state_path, state)
-            logger.info(
-                "Skipping stage %s because existing ranks snapshot was found.",
-                stage.name,
-            )
-            continue
-
         stage_state["status"] = "running"
         stage_state["attempts"] = attempts + 1
         stage_state["last_attempt_started_at_utc"] = _utc_now_iso()
@@ -385,6 +513,10 @@ def main() -> int:
             stage_state["status"] = "completed"
             _save_state(args.state_path, state)
             logger.info("Stage %s completed.", stage.name)
+            if stage.name == "get_game_data":
+                _cleanup_superseded_ingest_artifacts(
+                    Path(__file__).resolve().parents[2] / "data" / "ingest"
+                )
             continue
 
         stage_state["status"] = "failed"
