@@ -42,6 +42,7 @@ echo "Deploying ${APP_NAME} using config=${CONFIG_FILE} with git_sha=${git_sha} 
 fly deploy \
   -c "${CONFIG_FILE}" \
   -a "${APP_NAME}" \
+  --ignorefile "Dockerfile.ingest.dockerignore" \
   --build-arg "GIT_SHA=${git_sha}" \
   --build-arg "BUILD_TIMESTAMP=${build_timestamp}"
 
@@ -56,5 +57,5 @@ if command -v jq >/dev/null 2>&1; then
 fi
 
 echo "Deploy step complete. Next steps:"
-echo "  1) scripts/deploy/fly_ingest_set_secrets.sh"
-echo "  2) scripts/deploy/fly_ingest_start.sh"
+echo "  1) scripts/ingest/fly_ingest.sh secrets sync"
+echo "  2) scripts/ingest/fly_ingest.sh run fresh"
